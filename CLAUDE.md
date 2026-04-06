@@ -82,11 +82,183 @@ Why do it? → How far? → How to split? → How does it run? → Why this spli
 4. Diagrams over prose. Use text to explain what isn't obvious from the diagram.
 5. Expose uncertainty honestly. Hiding risks wastes reviewers' attention.
 
+## Code Review Guide
+
+### Part 1: PR Submission (Author's Responsibility)
+
+#### Size Principle
+
+**Submit PRs frequently and keep them small. One PR does one thing.**
+
+Judge by **intent**, not file count:
+
+- ✅ Fix a bug / add a feature / refactor a module → one PR
+- ❌ Fix a bug while refactoring, or add a feature while fixing unrelated typos → split them
+
+If a feature requires a refactor first, submit the refactor PR before the feature PR. Note in the refactor PR description: "Preparation for upcoming X feature."
+
+#### Before Opening a PR: Self-Review First
+
+Go through the diff yourself:
+- Any debug code, temporary comments, or console.log left behind?
+- Any unrelated changes mixed in?
+
+#### PR Description Template
+
+```markdown
+## Background
+## Root Cause (required for bugs, can be merged into Background)
+## Changes
+## Verification
+```
+
+**Background** — Describe the scenario, not the solution.
+
+❌ "Added modelId to modelBasicInfo"
+✅ "When running `model update`, even if only field bindings are changed, the API returns a duplicate name error"
+
+**Root Cause** — Trace to the actual cause, not just the symptom.
+
+❌ "modelId was not passed"
+✅ "modelBasicInfo was missing modelId, causing the backend's duplicate name check `!Objects.equals(modelBasicInfo.getModelId(), m.getId())` to always return true, unable to exclude the model itself"
+
+**Changes** — What changed AND what did not change. "What did not change" tells the reviewer where the boundary is.
+
+❌ Only: "Added modelId to modelBasicInfo"
+✅ Also: "Does not affect the create path (create uses independent logic)"
+
+**Verification** — Paste actual commands and outputs so the reviewer can judge whether coverage is sufficient.
+
+❌ "Tested, works fine"
+✅ Paste specific commands + actual outputs covering the root cause scenario and key edge cases
+
+**Level of detail by change type:**
+
+| Change Type | Required Sections |
+|-------------|------------------|
+| Typo, config tweak | One-line background is enough |
+| Bug fix | Background + Root Cause + Changes + Verification |
+| New feature | Background + Changes + Verification |
+| Cross-module refactor | All sections + potential risks |
+
+---
+
+### Part 2: Reviewer Steps
+
+**Step 1: Understand the Intent**
+
+Read the PR description and build context before looking at any code: what problem does this solve, what is the root cause, where is the boundary, how was it verified.
+
+**If the description is incomplete, send it back for the author to fill in. Do not start reviewing code.**
+
+**Step 2: Read the Code with Questions in Mind**
+
+- **Does the change fix the root cause?** Walk through the failure scenario mentally and confirm it can no longer reproduce.
+- **Does it introduce new problems?** Don't only read the diff — read the surrounding code for context.
+- **Is the scope appropriate?** Anything changed that shouldn't be? Anything missing that should be changed?
+
+**Step 3: Assess Whether Verification Is Credible**
+
+- Does it cover the scenario described in the root cause?
+- Does it only test the happy path, missing edge cases?
+- If insufficient, explicitly name the missing scenario and ask for it.
+
+**Step 4: Write Comments**
+
+Every comment must include:
+1. Point out the problem (filename + line number)
+2. Explain why it is a problem
+3. Suggest a direction or provide an example
+
+**Review angles and their priority:**
+
+🔴 **Must flag** → `[blocking]`
+
+| Angle | What to look for |
+|-------|-----------------|
+| **Correctness** | Logic errors, missing boundary conditions, null handling, incomplete branches |
+| **Security** | Unvalidated user input, sensitive data leaked to logs or stdout |
+| **Concurrency safety** | Race conditions, duplicate submission risk, incorrect async ordering |
+| **Idempotency** | Is it safe to retry write operations? Can repeated execution cause side effects? |
+| **Backward compatibility** | Do interface/parameter/output format changes break existing callers? |
+| **Exception path integrity** | Is system state consistent after an exception? Any half-written data? |
+| **Resource management** | Are files/connections properly released? Any memory leaks? |
+| **Impact on other paths** | Does the change accidentally affect other functionality? Read beyond the diff. |
+| **Architecture compliance** | Violates layering rules, module boundaries, or naming conventions |
+| **Maintainability** | This change introduces tight coupling or low cohesion; a function/module takes on too many responsibilities |
+
+🟡 **Should flag** → `[question]` or `[blocking]`
+
+| Angle | What to look for |
+|-------|-----------------|
+| **Readability** | Inaccurate names, missing comments on complex logic, functions doing more than one thing |
+| **Abstraction consistency** | High-level business logic and low-level implementation details mixed in the same function |
+| **Error handling** | External calls fail without proper handling; error messages are unclear |
+| **Performance** | Requests inside loops, N+1 queries, obvious performance traps |
+| **Observability** | Missing logs for key operations, incorrect log levels |
+| **Test coverage** | Core logic untested; bug fixes missing regression tests |
+| **Dead code / redundancy** | Unreachable code, duplicated logic, unused variables |
+
+⚪ **Do not flag**
+
+| Angle | Reason |
+|-------|--------|
+| **Code formatting** | Leave it to the linter — it should not appear in review comments |
+| **Personal preference** | If two approaches have no correctness difference, don't comment |
+| **Pre-existing issues** | Problems in code not touched by this PR — open a separate issue instead |
+
+**Comment labels:**
+
+| Label | Meaning | Blocks merge |
+|-------|---------|-------------|
+| `[blocking]` | Must be fixed | Yes |
+| `[question]` | Need author to clarify intent | Depends on answer |
+| `[nit]` | Optional improvement, author decides | No |
+
+All comments must have a label. Before writing, ask yourself: if this is not fixed, will it cause a production issue or mislead the next person reading this code?
+
+- Yes → `[blocking]`
+- Not sure → `[question]`
+- No, but could be better → `[nit]`
+- Pure personal preference → don't write it
+
+**Step 5: Give a Clear Conclusion**
+
+| Conclusion | Meaning |
+|------------|---------|
+| **Approve** | Ready to merge |
+| **Request Changes** | Has blocking issues; re-review required after fixes |
+| **Comment** | Has open questions; conclusion pending |
+
+**Never finish a review without giving a conclusion.**
+
+---
+
+### Part 3: Author's Responsibility After Receiving Comments
+
+Every comment must get an explicit response — silence is not acceptable:
+- `[blocking]` — Fix it, then re-request review
+- `[question]` — Explain your reasoning; reviewer decides if a change is needed
+- `[nit]` — Reply "done" or "not changing because X"
+
+---
+
+### Part 4: When Review Comes Too Late
+
+If a **design-level problem** is found during review (wrong direction, poor module decomposition), the review came too late. Design should be aligned before writing code. When this happens, schedule a separate discussion — do not block the PR indefinitely.
+
+---
+
 ## Testing Requirements
 
 - Every feature or bug fix must include unit tests
 - Write e2e tests for user-facing flows when applicable
 - After coding is complete, run all tests and provide a pass/fail summary report before finishing
+
+## Git Safety Rules
+
+- `git push` 前必须告知用户并等待确认，不可直接执行
+- `git push --force` / `git push -f`：**默认拒绝**，除非用户明确说"我知道风险，强制推送"
 
 ## Git Commit Convention
 
