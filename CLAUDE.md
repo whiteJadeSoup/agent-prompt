@@ -84,6 +84,62 @@ Why do it? → How far? → How to split? → How does it run? → Why this spli
 
 ## Code Review Guide
 
+### Part 0: Review Architecture (Multi-Agent Execution)
+
+Code review is executed by **3 parallel subagents + 1 orchestrator**. This reduces review time and ensures each concern gets dedicated focus.
+
+#### Subagent Responsibilities
+
+| Agent | Focus | Finding Types |
+|-------|-------|--------------|
+| **Agent A: Correctness & Safety** | Logic errors, security, concurrency, idempotency, backward compatibility, exception paths, resource management | Primarily `[blocking]` |
+| **Agent B: Quality & Resilience** | Error handling, performance, observability, impact on other paths, architecture compliance, maintainability | `[blocking]` or `[question]` |
+| **Agent C: Clarity & Coverage** | Readability, abstraction consistency, test coverage, dead code/redundancy | `[question]`, `[suggestion]`, `[nit]` |
+
+#### Subagent Output Format
+
+Each subagent must output a structured findings list. Free-text comments are not allowed at this stage.
+
+```json
+{
+  "findings": [
+    {
+      "id": "A-001",
+      "agent": "A",
+      "location": "UserService.java:87",
+      "severity": "blocking",
+      "angle": "security",
+      "what": "...",
+      "why": "...",
+      "proof": "...",
+      "suggestion": "..."
+    }
+  ]
+}
+```
+
+**Proof must be executable**: specify exact inputs, call sequence, or concurrent timing. If you cannot construct a concrete proof, set `severity` to `question`, never `blocking`.
+
+#### Orchestrator Responsibilities
+
+After all 3 subagents complete, the orchestrator:
+1. **Deduplicates**: if multiple agents flag the same location for the same reason, keep the highest-severity finding and merge the rationale
+2. **Resolves conflicts**: if agents disagree on severity for the same finding, use Agent A's judgment for correctness/security issues, Agent B's for quality issues
+3. **Formats**: converts structured findings into the comment format defined in Step 4
+4. **Concludes**: writes a mandatory conclusion (Approve / Request Changes / Comment)
+
+#### Execution Flow
+
+```
+PR Diff
+  ├─→ Agent A (correctness & safety) ─┐
+  ├─→ Agent B (quality & resilience) ─┼─→ Orchestrator → Final Review
+  └─→ Agent C (clarity & coverage)  ─┘
+         [parallel]                        [sequential]
+```
+
+---
+
 ### Part 1: PR Submission (Author's Responsibility)
 
 #### Size Principle
@@ -261,8 +317,8 @@ Every comment must be structured as follows:
 
 **2. Problem** — Structured explanation:
 - **What**: which line(s) or code path cause the issue
-- **Why**: the reasoning — include the execution flow if the bug is non-obvious (e.g., "A calls B with X, B passes X to C without validation, C crashes on null"). **Use a diagram whenever it makes the flow clearer** — a sequence diagram for call chains, a flowchart for branching logic, a state diagram for lifecycle bugs.
-- **Proof**: construct the minimal scenario that triggers the problem (e.g., specific input, concurrent timing, config flag). If you cannot construct one, use `[question]` instead of `[blocking]`. **Use a diagram when the trigger condition involves a sequence of steps or concurrent timing** — it is often clearer than prose.
+- **Why**: the reasoning — include the execution flow if the bug is non-obvious (e.g., "A calls B with X, B passes X to C without validation, C crashes on null"). Every `[blocking]` comment **must** include a call chain or data flow diagram. A blocking comment without a diagram is considered incomplete.
+- **Proof**: construct the minimal scenario that triggers the problem (e.g., specific input, concurrent timing, config flag). **Proof must be a concrete, executable minimal reproduction** (specific input values, call sequence, or concurrent timing). Hypothetical descriptions like "if X happens then Y" are not allowed. If you cannot construct a concrete proof, you must downgrade severity to `[question]`, never `[blocking]`. **Use a diagram when the trigger condition involves a sequence of steps or concurrent timing** — it is often clearer than prose.
 
 **3. Suggestion** — A concrete fix direction, with a brief justification for why it is correct. If the suggestion involves a non-trivial change, show a sketch or pseudocode and explain why it avoids the problem. **Use a diagram to show the corrected flow when the fix changes a call chain, branching logic, or state transition.**
 
@@ -348,7 +404,9 @@ All comments must have a label. Before writing, ask yourself: if this is not fix
 - No, but could be better → `[nit]`
 - Pure personal preference → don't write it
 
-**Writing a `[suggestion]` comment** — The bar is higher than `[nit]`: you must research multiple options and recommend one. A suggestion without alternatives is just an opinion. Structure it as:
+**LLM-specific warning — prevent over-flagging**: The only criterion for `[blocking]` is: **would this cause an observable error or data problem in production if not fixed?** When uncertain, use `[question]`, not `[blocking]`. It is better to miss a blocking issue than to mislabel a question as blocking.
+
+**Writing a `[suggestion]` comment** — The bar is higher than `[nit]`: you must research multiple options and recommend one. A suggestion without alternatives is just an opinion. Before writing a suggestion, you **must research industry practices via web search**. Suggestions based solely on internal reasoning are not allowed. Structure it as:
 
 1. **Current behavior** — what the code does now, and under what conditions it becomes a problem (scale threshold, edge case, maintainability cliff)
 2. **Options** — research ≥2 alternatives (including keeping the current approach as a baseline). For each: what it is, its key benefits, and its trade-offs. Use a comparison table when there are ≥3 options.
@@ -393,6 +451,8 @@ All comments must have a label. Before writing, ask yourself: if this is not fix
 | **Comment** | Has open questions; conclusion pending |
 
 **Never finish a review without giving a conclusion.**
+
+**Hard requirement**: Every review must end with an explicit conclusion. Outputting comments without providing an Approve / Request Changes / Comment conclusion means the review is incomplete.
 
 ---
 
