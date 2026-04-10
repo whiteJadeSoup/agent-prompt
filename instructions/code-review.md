@@ -39,7 +39,7 @@ Each subagent must output a structured findings list. Free-text comments are not
 ### Orchestrator Responsibilities
 
 **Before dispatching subagents**, the orchestrator must inject the full review context into each subagent's prompt. Subagents do not have access to this guide automatically — they only know what the orchestrator tells them. Each subagent prompt must include:
-- The PR diff
+- The PR identifier (number or branch) — subagents read the code themselves
 - The agent's assigned focus area (from the table above)
 - The complete **Step 2 skeptical questioning patterns**
 - The complete **review angles table** (both 🔴 blocking and 🟡 question angles)
