@@ -23,13 +23,15 @@ Why do it? → How far? → How to split? → How does it run? → Why this spli
 - How to identify non-goals: (a) requirements stakeholders might request but are excluded this time, (b) natural extensions of adjacent problems, (c) boundaries where the team has divergent opinions.
 - Litmus test: if a non-goal is something nobody would do anyway, it carries no information — delete it.
 
-**3. Architecture Overview** (with diagram)
+**3. Architecture Overview** (diagram required — ASCII art, Mermaid, or any text-based format)
+- **Draw an architecture diagram (ASCII art, Mermaid, or any text-based format). This section is not complete without one** — prose description alone is not acceptable.
 - Draw the full system, highlight incremental changes (solid lines = existing, bold/dashed = new/modified, gray/strikethrough = removed).
 - Group by responsibility, not by code structure.
 - Only draw the layers the reader needs to understand. If the change is application-level, infrastructure is just a labeled box.
 - Arrows show dependency direction; label the interaction type (sync call / async event / polling).
 
-**4. Core Flows** (with sequence or flow diagrams)
+**4. Core Flows** (sequence or flow diagram required — ASCII art, Mermaid, or any text-based format)
+- **Draw a sequence or flow diagram for each core flow (ASCII art, Mermaid, or any text-based format). This section is not complete without one** — skip only if the entire flow is a single linear step with no branching, error path, or concurrency.
 - Participants are **modules / services / roles**, not classes or functions.
 - Only main path + 1-2 critical error paths.
 - Granularity rule: **no function names should appear**. Write "auth service validates request", not `authService.validate()`.
@@ -79,5 +81,5 @@ Why do it? → How far? → How to split? → How does it run? → Why this spli
 1. Every section must trace back to a design goal. If it doesn't relate to any goal, delete it.
 2. If removing a paragraph still lets the reader make correct decisions, that paragraph shouldn't exist.
 3. Record **why**, not **what**. Code is the authoritative "what".
-4. Diagrams over prose. Use text to explain what isn't obvious from the diagram.
+4. **Diagrams over prose — default to diagrams (ASCII art, Mermaid, or any text-based format).** Use text only to explain what isn't obvious from the diagram. Omitting a diagram requires an explicit reason (e.g., "single linear step, no branching").
 5. Expose uncertainty honestly. Hiding risks wastes reviewers' attention.
