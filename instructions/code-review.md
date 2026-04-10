@@ -41,9 +41,7 @@ Each subagent must output a structured findings list. Free-text comments are not
 **Before dispatching subagents**, the orchestrator must inject the full review context into each subagent's prompt. Subagents do not have access to this guide automatically — they only know what the orchestrator tells them. Each subagent prompt must include:
 - The PR identifier (number or branch) — subagents read the code themselves
 - The agent's assigned focus area (from the table above)
-- The complete **Step 2 skeptical questioning patterns**
-- The complete **review angles table** (both 🔴 blocking and 🟡 question angles)
-- The **comment label definitions** (`[blocking]`, `[question]`, `[suggestion]`, `[nit]`)
+- The **complete contents of this code review guide** (Parts 1–4), so the subagent applies the same skeptical mindset, diagram requirements, comment format, label definitions, and angles table
 - The **output format** (JSON findings schema above)
 
 After all 3 subagents complete, the orchestrator:
