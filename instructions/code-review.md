@@ -213,11 +213,53 @@ Read the PR description and build context before looking at any code: what probl
 
 **If the description is incomplete, send it back for the author to fill in. Do not start reviewing code.**
 
-**Step 2: Read the Code with Questions in Mind**
+**Step 2: Read the Code Skeptically**
 
-- **Does the change fix the root cause?** Walk through the failure scenario mentally and confirm it can no longer reproduce.
-- **Does it introduce new problems?** Don't only read the diff — read the surrounding code for context.
-- **Is the scope appropriate?** Anything changed that shouldn't be? Anything missing that should be changed?
+Approach the code as a skeptic, not a validator. The PR description is a hypothesis — your job is to stress-test it, not confirm it. Assume the author is competent and well-intentioned. The question is not "did they make a mistake?" but **"what situation would make this solution wrong?"**
+
+Work through the following questioning patterns before forming any judgment:
+
+**Does this actually fix the root cause?**
+- The PR says X causes Y. Is there another path that also causes Y, which this fix doesn't touch?
+- The fix is applied at layer A. Could the same bug re-enter from layer B?
+
+*Example: A fix that adds a null-check in the service layer — but the controller can also call the downstream directly, bypassing the check entirely.*
+
+**What if the inputs are different?**
+- What if this field is null / empty / negative / max-int / a very long string?
+- What if the caller sends two concurrent requests for the same resource?
+- What if this runs during a partial failure — e.g., the DB write succeeds but the cache invalidation fails?
+
+*Example: A "create if not exists" implementation that works correctly in isolation but creates duplicates under concurrent load.*
+
+**What if the environment changes?**
+- What if the dependent service is slow or unavailable?
+- What if this is called at 10x the expected volume?
+- What if this code executes in a different order than the author assumed (e.g., retries, async callbacks)?
+
+*Example: A retry loop that is safe when idempotent, but causes double-charges when the underlying operation is not.*
+
+**Does the fix hold at the boundary?**
+- The fix works for the described scenario. Does it also work for the adjacent scenario the PR doesn't mention?
+- Is there an off-by-one, a timezone edge, an encoding edge, a locale-specific behavior?
+
+*Example: A date comparison that works correctly in UTC but silently breaks for users in UTC+14.*
+
+**Are the claims in the PR description actually verified?**
+- The PR says "confirmed by logging X" — is that log sufficient proof, or could it be misleading?
+- The PR says "this doesn't affect path Z" — did the author verify that, or just assert it?
+
+*Example: A PR claims the create path is unaffected, but the reviewer finds both create and update share the same helper function that was modified.*
+
+**Output rule**: Every question you raise must be resolved before moving to Step 3.
+- If reading the code answers it → answer it and move on
+- If the code doesn't answer it → it becomes a `[blocking]` or `[question]` comment
+- Do not silently drop questions you cannot answer
+
+**Closing checklist** (after the skeptical pass):
+- Does the change fix the root cause?
+- Does it introduce new problems? Don't only read the diff — read the surrounding code for context.
+- Is the scope appropriate? Anything changed that shouldn't be? Anything missing that should be changed?
 
 **Step 3: Assess Whether Verification Is Credible**
 
