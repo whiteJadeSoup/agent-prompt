@@ -38,6 +38,14 @@ Each subagent must output a structured findings list. Free-text comments are not
 
 ### Orchestrator Responsibilities
 
+**Before dispatching subagents**, the orchestrator must inject the full review context into each subagent's prompt. Subagents do not have access to this guide automatically — they only know what the orchestrator tells them. Each subagent prompt must include:
+- The PR identifier (number or branch) — subagents read the code themselves
+- The agent's assigned focus area (from the table above)
+- The complete **Step 2 skeptical questioning patterns**
+- The complete **review angles table** (both 🔴 blocking and 🟡 question angles)
+- The **comment label definitions** (`[blocking]`, `[question]`, `[suggestion]`, `[nit]`)
+- The **output format** (JSON findings schema above)
+
 After all 3 subagents complete, the orchestrator:
 1. **Deduplicates**: if multiple agents flag the same location for the same reason, keep the highest-severity finding and merge the rationale
 2. **Resolves conflicts**: if agents disagree on severity for the same finding, use Agent A's judgment for correctness/security issues, Agent B's for quality issues
