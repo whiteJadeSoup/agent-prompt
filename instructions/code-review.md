@@ -90,7 +90,7 @@ Go through the diff yourself:
 ❌ "Added modelId to modelBasicInfo"
 ✅ "When running `model update`, even if only field bindings are changed, the API returns a duplicate name error"
 
-**Root Cause** — Trace to the actual cause, not just the symptom. Point to the specific code responsible, and explain how you confirmed it is the cause. **Use a diagram when the bug involves a call chain, data flow, or conditional branch** — it is often faster to read than a paragraph of prose.
+**Root Cause** — Trace to the actual cause, not just the symptom. Point to the specific code responsible, and explain how you confirmed it is the cause. **Draw a diagram (ASCII call chain, flow, or sequence) unless the entire root cause fits in one sentence with no branching.** Prose alone is not acceptable for multi-step or conditional causes.
 
 ❌ "modelId was not passed"
 
@@ -106,7 +106,7 @@ Go through the diff yourself:
 > ```
 > Confirmed by adding a log at `ModelService.java:142` to print `modelBasicInfo.getModelId()` — it printed `null` on every update request, regardless of the actual model ID.
 
-**Solution Overview** — Explain *what* you chose to fix and *why* at that layer, not *how* (the code is the how). **Use a diagram to illustrate the solution** — show the corrected call chain, data flow, or state transition so the reviewer understands the approach before reading the diff. List rejected alternatives and why they were ruled out.
+**Solution Overview** — Explain *what* you chose to fix and *why* at that layer, not *how* (the code is the how). **Draw a diagram (ASCII call chain, flow, or sequence) showing the corrected path — required unless the fix is a single-line change with no structural effect.** The reviewer must understand the approach from the diagram before reading the diff. List rejected alternatives and why they were ruled out.
 
 ❌ "Added modelId to `modelBasicInfo`"
 
@@ -233,10 +233,10 @@ Every comment must be structured as follows:
 
 **2. Problem** — Structured explanation:
 - **What**: which line(s) or code path cause the issue
-- **Why**: the reasoning — include the execution flow if the bug is non-obvious (e.g., "A calls B with X, B passes X to C without validation, C crashes on null"). Every `[blocking]` comment **must** include a call chain or data flow diagram. A blocking comment without a diagram is considered incomplete.
-- **Proof**: construct the minimal scenario that triggers the problem (e.g., specific input, concurrent timing, config flag). **Proof must be a concrete, executable minimal reproduction** (specific input values, call sequence, or concurrent timing). Hypothetical descriptions like "if X happens then Y" are not allowed. If you cannot construct a concrete proof, you must downgrade severity to `[question]`, never `[blocking]`. **Use a diagram when the trigger condition involves a sequence of steps or concurrent timing** — it is often clearer than prose.
+- **Why**: the reasoning — include the execution flow. **Draw an ASCII diagram (call chain, flow, or sequence) by default. Skip only if the entire Why fits in one sentence with no branching or concurrency.** A `[blocking]` comment without a diagram is considered incomplete.
+- **Proof**: construct the minimal scenario that triggers the problem (e.g., specific input, concurrent timing, config flag). **Proof must be a concrete, executable minimal reproduction** (specific input values, call sequence, or concurrent timing). Hypothetical descriptions like "if X happens then Y" are not allowed. If you cannot construct a concrete proof, you must downgrade severity to `[question]`, never `[blocking]`. **Draw a diagram when the trigger involves a sequence of steps or concurrent timing.**
 
-**3. Suggestion** — A concrete fix direction, with a brief justification for why it is correct. If the suggestion involves a non-trivial change, show a sketch or pseudocode and explain why it avoids the problem. **Use a diagram to show the corrected flow when the fix changes a call chain, branching logic, or state transition.**
+**3. Suggestion** — A concrete fix direction, with a brief justification for why it is correct. **Draw an ASCII diagram showing the corrected flow — required unless the fix is a single-line change with no structural effect.** If the suggestion involves a non-trivial change, also show pseudocode and explain why it avoids the problem.
 
 *Example of a well-written comment:*
 
@@ -326,7 +326,7 @@ All comments must have a label. Before writing, ask yourself: if this is not fix
 
 1. **Current behavior** — what the code does now, and under what conditions it becomes a problem (scale threshold, edge case, maintainability cliff)
 2. **Options** — research ≥2 alternatives (including keeping the current approach as a baseline). For each: what it is, its key benefits, and its trade-offs. Use a comparison table when there are ≥3 options.
-3. **Recommendation** — which option you suggest and why, with a diagram if it changes a flow or structure
+3. **Recommendation** — which option you suggest and why. **Draw an ASCII diagram showing the recommended flow — required unless the recommendation involves no structural change.**
 4. **Trade-off** — what the author gives up by adopting the recommendation, so they can make an informed call
 
 *Example:*
