@@ -1,6 +1,10 @@
 # Design Plan Guide
 
-When writing a design plan, produce a single document with two parts: **Overview Design** (why + what) and **Detail Design** (how). Not every change needs a design plan — only write one when the change involves design decisions others need to understand (cross-module changes, new modules, architecture changes, multi-person collaboration).
+A design plan is a single document with two parts written in sequence: **Overview Design** (why + what) first, **Detail Design** (how) after the overview is confirmed. Not every change needs a design plan — only write one when the change involves design decisions others need to understand (cross-module changes, new modules, architecture changes, multi-person collaboration).
+
+**Workflow:**
+1. Write Part 1 (Overview Design) and get it confirmed before proceeding.
+2. Write Part 2 (Detail Design) in the same document, below the confirmed overview. The final document is self-contained — Overview Design at the top provides the full context, so readers understand the complete design from this single document.
 
 > **Apply Design Thinking Rules when working through each section.**
 
@@ -59,6 +63,8 @@ Why do it? → How far? → How to split? → How does it run? → Why this spli
 **6. Risks & Open Questions** — For each risk: description → impact scope → mitigation idea. For open questions: note the expected decision timeline.
 
 ## Part 2: Detail Design
+
+> **Prerequisite:** Part 1 (Overview Design) must be confirmed before writing this part. The confirmed overview stays at the top of this document as context — each section below should trace back to its architecture, flows, decisions, and goals.
 
 **1. Module Responsibilities & Interfaces** — Full contract, mark incremental changes. Existing interfaces: signature only. New/modified: full definition (params, return, errors, preconditions).
 

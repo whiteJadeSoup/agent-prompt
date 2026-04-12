@@ -2,7 +2,7 @@
 
 ## Design
 @instructions/design-thinking.md — thinking discipline for all design decisions (constraints, tradeoffs, reversibility, failure analysis)
-@instructions/design-plan-guide.md — template for writing formal design documents (Overview + Detail Design)
+@instructions/design-plan-guide.md — template for writing formal design documents (Overview Design first, then Detail Design)
 
 ## Implementation
 @instructions/implementation.md — coding discipline: read before write, follow existing patterns, no speculative abstractions
