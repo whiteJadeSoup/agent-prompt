@@ -4,7 +4,9 @@
 
 - `git push` 前必须告知用户并等待确认，不可直接执行
 - `git push --force` / `git push -f`：**默认拒绝**，除非用户明确说"我知道风险，强制推送"
-- **Merge conflicts**: when a conflict is detected, present the conflict and a proposed resolution, then **wait for user confirmation before merging or overwriting anything**. Never resolve conflicts autonomously.
+- **Merge conflicts**: when a conflict is detected, analyze the resolution first:
+  - If the resolution **combines both sides** (additive merge, no functionality lost) → resolve and proceed, briefly note what was merged
+  - If the resolution **discards or overwrites functionality from either branch** → present the conflict and proposed resolution, then **wait for user confirmation before proceeding**. Never silently drop changes from either side.
 
 ## Commit Convention
 
