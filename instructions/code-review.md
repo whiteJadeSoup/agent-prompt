@@ -428,6 +428,29 @@ Every comment must get an explicit response — silence is not acceptable:
 - `[suggestion]` — Reply with one of: "adopting, will address in follow-up PR", "adopting now", or "not adopting because X" (X must engage with the trade-off, not just dismiss it)
 - `[nit]` — Reply "done" or "not changing because X"
 
+**Resolving threads**: after addressing a comment, the **author resolves the thread**. Resolving requires one of:
+- **Code change**: the fix is committed, then resolve the thread
+- **Rebuttal**: a clear, reasoned argument why the comment doesn't apply — if the reviewer accepts it, resolve; if not, keep open until agreement
+
+"Acknowledged" or "will look into it" is not sufficient to resolve. A thread must not be resolved without a concrete action or decision.
+
+`[suggestion]` and `[nit]` threads are closed by the author's reply alone — the reviewer does not need to re-confirm. Resolve the thread after replying.
+
+**Only the author resolves threads.** Reviewers must not resolve threads on behalf of the author — doing so silently closes the discussion and hides the author's response from future readers.
+
+**When to re-request review**: only after (1) all `[blocking]` issues are fixed, (2) all `[question]` comments have been replied to, and (3) all comment threads are resolved. Do not re-request review with open threads — the reviewer will see unresolved comments and have to ask what's pending.
+
+---
+
+## Part 3.5: Re-review Responsibilities
+
+When re-reviewing after author changes:
+- **Primary goal**: verify that all previous `[blocking]` and `[question]` findings are correctly addressed
+- **New findings are allowed**: if the reviewer notices a new problem (whether introduced by the fix or previously missed), flag it — but label it explicitly as `[new finding]` so the author knows it was not part of the original review
+- Do not re-open original threads for new issues — open a fresh comment instead
+
+Re-review ends with an updated conclusion (Approve or Request Changes). A re-review that only says "looks good" without checking each previous finding is incomplete.
+
 ---
 
 ## Part 4: When Review Comes Too Late
