@@ -42,6 +42,7 @@ Self-check before moving on:
 1. If you swap the Role for a different user type, does the Story still hold? If yes, the Role is too generic.
 2. Remove "so that" — does the team still know why this feature exists? If not, rewrite it.
 3. Can each AC be written as a standalone test case? If not, the AC is too vague.
+4. List all roles that interact with this feature (users, admins, downstream systems, ops). Does each role have at least one Story? If not, the Goals are incomplete.
 
 *Example:*
 > As a data analyst,
