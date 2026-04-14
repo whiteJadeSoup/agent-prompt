@@ -22,8 +22,42 @@ Why do it? → How far? → How to split? → How does it run? → Why this spli
 **1. Problem Statement** — Describe the current pain point and what triggered this work. Include quantitative data if available. Do NOT describe the solution here.
 
 **2. Goals & Non-Goals**
-- Goals should be verifiable ("support 100k DAU" not "improve performance").
-- Non-goals are more important than goals — they prevent scope creep.
+
+Goals must be verifiable. How to express them depends on the change type:
+
+**For user-facing features** — write each goal as a User Story:
+```
+As a <specific role>,
+I want to <behavior, not a feature>,
+so that <the value or outcome>.
+```
+Each User Story must include **Acceptance Criteria** covering three paths:
+- **Happy path**: the core scenario works correctly
+- **Edge case**: boundary conditions (empty, max-length, concurrent)
+- **Error path**: how the system responds on failure
+
+Use Given/When/Then format for AC — each criterion must be independently testable.
+
+Self-check before moving on:
+1. If you swap the Role for a different user type, does the Story still hold? If yes, the Role is too generic.
+2. Remove "so that" — does the team still know why this feature exists? If not, rewrite it.
+3. Can each AC be written as a standalone test case? If not, the AC is too vague.
+
+*Example:*
+> As a data analyst,
+> I want to search metrics by keyword from the CLI,
+> so that I can quickly locate a metric without knowing its exact name.
+>
+> Acceptance Criteria:
+> - Given keyword "gmv", When running `metric search gmv`, Then stdout returns a list containing "gmv" (JSON format)
+> - Given no matches, Then stdout returns `[]`, exit code 0
+> - Given network timeout, Then stderr outputs error message, exit code 1
+
+**For technical changes** (refactoring, performance, infrastructure) — write verifiable technical targets directly. User Story format is not required and should not be forced.
+
+*Example:* "Reduce p99 API latency from 800ms to under 200ms under 1000 concurrent requests"
+
+Non-goals are more important than goals — they prevent scope creep.
 - How to identify non-goals: (a) requirements stakeholders might request but are excluded this time, (b) natural extensions of adjacent problems, (c) boundaries where the team has divergent opinions.
 - Litmus test: if a non-goal is something nobody would do anyway, it carries no information — delete it.
 
