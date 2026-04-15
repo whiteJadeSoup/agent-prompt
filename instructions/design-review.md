@@ -214,3 +214,134 @@ Re-request review only after all `[blocking]` issues are resolved and all thread
 - **Primary goal**: verify that all previous `[blocking]` and `[question]` findings are correctly addressed
 - **New findings are allowed**: label them `[new finding]` — open a fresh comment, do not re-open original threads
 - Re-review ends with an updated conclusion (Confirm or Request Changes)
+
+---
+
+## Phase 2: Detail Design Review
+
+### Core Question
+
+**"If we implement this Detail Design, can it fulfill every promise made in the Overview?"**
+
+Two failure modes:
+- **Missing coverage** — a Goal, AC, or Core Flow from Overview has no corresponding implementation in Detail
+- **Broken contract** — the spec exists but has gaps that will cause incorrect behavior at the boundary
+
+### Common Principles
+
+1. **Skip sections that don't exist — but ask why.** Absent section + feature that needs it → `[blocking]`
+2. **Every finding traces back to Overview.** Blocking standard: if unresolved, a Goal or AC from Overview cannot be satisfied.
+3. **Find failure scenarios, not confirmations.** Find the input, state, or condition that breaks the spec.
+4. **Forward compatibility is the default.** Any breaking change must explicitly state what breaks, who is affected, and the resolution steps. Breaking without explanation → `[blocking]`
+
+### Execution Architecture
+
+```
+Section 0 (Coverage Check) — single agent, sequential
+         ↓  [coverage map passed to all section agents]
+Sections 1–8 — parallel, one agent per section
+         ↓
+Orchestrator — deduplicate, format, conclude
+```
+
+**Before dispatching section agents**, the orchestrator runs Section 0 first and injects its coverage map into each section agent's prompt. Each section agent also receives: the confirmed Overview Design, the Detail Design, and the complete contents of this guide.
+
+Each agent outputs findings in the same JSON schema as Overview Review.
+
+---
+
+### Section 0: Coverage Check (always required)
+
+Map every Goal, AC, and Core Flow from Overview to a section in Detail. Any unmapped item → `[blocking]`.
+
+Pass the coverage map to all section agents.
+
+---
+
+### Section 1: Module Responsibilities & Interfaces
+
+Play the role of a caller. Using only the Detail spec, can you implement the calling side correctly?
+
+- Preconditions complete? Any hidden assumptions the caller won't know?
+- All error cases defined? Can the caller distinguish different failure types?
+- Return values unambiguous? Any fields "sometimes null" without explanation?
+
+---
+
+### Section 2: Data Model / Schema
+
+Construct an illegal business state that the schema permits.
+
+- Any field combination that's schema-valid but business-invalid? (e.g., `status=completed`, `completed_at=null`)
+- Any cross-field dependencies not expressed as constraints?
+- Indexes aligned with actual query patterns?
+
+---
+
+### Section 3: Core Algorithms / State Machines
+
+Find an input or state that makes the algorithm produce a wrong result.
+
+- Any legal event with no defined state transition?
+- Do declared invariants hold on all execution paths?
+- Does each Core Flow from Overview have a corresponding execution path here?
+
+---
+
+### Section 4: Error Handling
+
+List all external interaction points. For each: is the failure mode named and handled?
+
+- Can the caller distinguish transient from permanent failures?
+- Are retries idempotent?
+- Does error path behavior match the AC error path?
+
+---
+
+### Section 5: Key Flows
+
+Compare against Overview's Core Flows.
+
+- Every Core Flow has a detailed counterpart?
+- All branches covered, not just main path?
+- Parameters consistent with Section 1 interfaces?
+- Every AC scenario has a complete execution path?
+
+---
+
+### Section 6: Performance Estimation
+
+One question: **is the estimate credible?**
+
+- Input assumptions (QPS, data size, latency) stated explicitly and sourced?
+- Bottleneck on the critical path identified?
+- Conclusion aligns with quantitative Goals?
+
+---
+
+### Section 7: Testing Strategy
+
+- If User Stories exist: every AC has a corresponding test case?
+- If technical change: pass criteria trace back to quantitative Goals?
+- Mock boundaries justified? Does mocking hide real integration risks?
+
+---
+
+### Section 8: Migration & Compatibility
+
+Forward compatibility is the default.
+
+- Does the change break existing callers, data readers, or rollback paths?
+- If yes: are risks, affected parties, and resolution steps explicitly stated? If not → `[blocking]`
+
+---
+
+### Conclusion
+
+| Conclusion | Meaning |
+|------------|---------|
+| **Confirm** | Detail Design is sound — proceed to implementation |
+| **Request Changes** | Blocking issues present; re-review required |
+| **Comment** | Open questions pending; conclusion deferred |
+
+Every Detail Review must end with an explicit conclusion.
