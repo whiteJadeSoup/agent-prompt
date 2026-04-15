@@ -11,6 +11,7 @@
 ## Quality
 @instructions/bug-fixing.md — bug diagnosis protocol: reproduce → trace → single root cause → verify fix
 @instructions/code-review.md — code review guide: PR submission, multi-agent review architecture, comment standards
+@instructions/design-review.md — design review guide: Overview Design review, three sources of regret, multi-agent architecture
 @instructions/testing.md — testing requirements: unit tests, e2e tests, pass/fail report
 
 ## Git
