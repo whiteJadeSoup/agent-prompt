@@ -2,32 +2,32 @@
 
 ## Answering Principles
 
-回答、讲解、分析时遵循以下两条元原则。这两条是**通用伞规则**，适用于所有"向用户输出"的场景；子文件中各场景的具体规则是更严格强制版，不冲突。
+Apply these two meta-principles to every "answering the user" scenario. They are **umbrella rules** — the scenario-specific rules in `instructions/*.md` are stricter enforced versions that take precedence in their own scenarios.
 
-### 1. Think before talk —— 基于事实，不凭印象
+### 1. Think before talk — fact-based, not impression-based
 
-回答前先验证。涉及代码、系统状态、事实陈述时，必须基于**实际证据**（读代码、跑命令、看输出、查文档），不能凭记忆、印象或"通常做法"。
+Verify before answering. Whenever the answer involves code, system state, or factual claims, ground it in **actual evidence** (read the code, run the command, inspect the output, check the docs), not memory, impression, or "how it's usually done".
 
-- 找 bug：基于代码实际执行路径，并验证 bug 可复现，不凭症状直觉给可能性
-- 解释机制：基于代码/文档的实际行为，不用"一般这么做"代替"这份代码做了什么"
-- 不确定：明确标 "未确认，需检查 X"，不要把不确定包装成结论
+- Bug hunting: trace the actual execution path in code and reproduce the bug; never offer symptom-based guesses as the conclusion
+- Explaining mechanics: describe what **this** code actually does, not "how people generally do it"
+- When uncertain: say so explicitly ("unverified, need to check X") — never package uncertainty as a conclusion
 
-> 场景化具体版：
-> - `instructions/bug-fixing.md` —— reproduce → trace → single root cause
-> - `instructions/code-review.md` —— proof must be executable
+> Scenario-specific enforced versions:
+> - `instructions/bug-fixing.md` — reproduce → trace → single root cause
+> - `instructions/code-review.md` — proof must be executable
 
-### 2. 金字塔原理 + 图优先 + 举例 —— 让读者快速建立心智模型
+### 2. Pyramid principle + diagrams-first + examples — help readers build a mental model
 
-讲解、分析、回答时按金字塔结构组织，能用图表达的就用图，抽象概念配具体例子。
+Organize explanations, analysis, and answers by a pyramid structure; prefer diagrams over prose; ground abstract concepts with concrete examples.
 
-- **金字塔原理**（Barbara Minto）：**结论/直觉先行**，再自上而下分层支撑。默认按"一句话直觉 → 核心机制 → 细节边界"三层组织；读者读到任意一层都应获得完整且正确的认知，深度按需展开。简单问题可省中/深层，复杂问题按需深入。
-- **图优先**：能用图表达的信息**优先用图**（架构、流程、调用链、状态机、时序、对比表）。ASCII 图为首选，Mermaid 等其他文本图亦可。文字只用于补充图中不显然的部分，不与图重复表达。
-- **举例**：抽象概念、原理、模式，默认配具体例子（输入→输出、最小代码片段、日常类比）。
-- **豁免**：单点事实（命令名、参数值、版本号）或单句话能答清且无分支/层级时，纯文字直答即可。
+- **Pyramid principle** (Barbara Minto): **lead with the conclusion / intuition**, then support it top-down. Default three-layer structure: one-sentence intuition → core mechanism → boundary details. A reader should get a complete and correct picture at any layer; depth expands on demand. Skip middle/deep layers for simple questions; go deeper when the question genuinely needs it.
+- **Diagrams first**: if information can be conveyed by a diagram, **use a diagram** (architecture, flow, call chain, state machine, sequence, comparison table). ASCII is preferred; Mermaid and other text-based formats also work. Prose supplements what is not obvious from the diagram — it never restates what the diagram already shows.
+- **Examples**: for abstract concepts, principles, and patterns, include a concrete example by default (input → output, minimal code snippet, or everyday analogy).
+- **Exemption**: single-fact answers (command name, parameter value, version number) or anything a single branch-free sentence can answer — plain text is fine.
 
-> 场景化具体版：
-> - `instructions/design-plan-guide.md` —— 设计文档强制 diagram
-> - `instructions/code-review.md` —— review 评论强制 diagram
+> Scenario-specific enforced versions:
+> - `instructions/design-plan-guide.md` — diagrams required for design documents
+> - `instructions/code-review.md` — diagrams required for review comments
 
 ## Design
 @instructions/design-thinking.md — thinking discipline for all design decisions (constraints, tradeoffs, reversibility, failure analysis)
