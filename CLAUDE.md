@@ -34,7 +34,10 @@ Organize explanations, analysis, and answers by a pyramid structure; prefer diag
 @instructions/design-plan-guide.md — template for writing formal design documents (Overview Design first, then Detail Design)
 
 ## Implementation
-@instructions/implementation.md — coding discipline: read before write, follow existing patterns, no speculative abstractions
+
+**When writing or modifying code, you must follow the disciplines below.** These are not optional guidelines — every coding task (new feature, bug fix, refactor, small tweak) must be executed against these rules, and the final output must reflect them.
+
+@instructions/implementation.md — coding discipline: read before write, follow existing patterns, minimum change, no speculative abstractions, comment generously but only the WHY
 @instructions/refactoring.md — refactoring protocol: separate from behavioral changes, test coverage first, scope control
 
 ## Quality
