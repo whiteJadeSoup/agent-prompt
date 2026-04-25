@@ -1,126 +1,141 @@
 # Design Plan Guide
 
-A design plan is a single document with two parts written in sequence: **Overview Design** (why + what) first, **Detail Design** (how) after the overview is confirmed. Not every change needs a design plan — only write one when the change involves design decisions others need to understand (cross-module changes, new modules, architecture changes, multi-person collaboration).
+A design plan exists so others can review your design decisions. Write one only for changes others must understand: cross-module work, new modules, architecture shifts, multi-person collaboration.
 
-**Workflow:**
-1. Write Part 1 (Overview Design) and get it confirmed before proceeding.
-2. Write Part 2 (Detail Design) in the same document, below the confirmed overview. The final document is self-contained — Overview Design at the top provides the full context, so readers understand the complete design from this single document.
+The document has two parts: **Overview** (why + what) confirmed first, then **Detail** (how) below it. The final doc reads top to bottom in one pass.
 
-> **Apply Design Thinking Rules when working through each section.**
+> **Apply Design Thinking Rules to every section.**
 
 ## Part 1: Overview Design
 
-The six sections form a decision chain — each exists because without it, the next section loses its basis for judgment:
+**1. Problem & Goals**
+- **Problem** — the pain point and trigger. Quantify if data exists. Do not describe the solution.
+- **Goals** — how success is judged. Quantify when possible. For performance / capacity / SLA goals, quantification is **not optional in Overview**. For other goals, if a number is unavailable now, write "to be quantified in Detail Design" — never leave the gap implicit.
+- **Non-Goals** — required output. What this work explicitly does not cover. Drop any non-goal nobody would do anyway.
 
-```
-Why do it? → How far? → How to split? → How does it run? → Why this split? → What's uncertain?
-    │            │            │               │                  │                  │
- Problem    Goals/Non-    Architecture    Core Flows        Key Decisions     Risks & Open
- Statement  Goals         Overview                                            Questions
-```
+**2. Solution Design** — presents **the chosen solution** (alternatives belong in Section 3).
 
-**1. Problem Statement** — Describe the current pain point and what triggered this work. Include quantitative data if available. Do NOT describe the solution here.
+**Diagrams are required, and they come before prose.** Prose explains only what diagrams cannot — participant roles, dependency types, error-path triggers. Restating the diagram in words is grounds for review rejection.
+- **Architecture Diagram** — modules and dependency directions; mark added / modified / removed; stay above class/function level.
+- **Flow Diagrams** — one core flow (main path) and 1–2 edge flows (critical error / boundary paths). Participants are modules / services / roles. **No function names** — those belong in Detail.
 
-**2. Goals & Non-Goals**
+**3. Research & Comparison** — **web search is mandatory before writing this section.** Decisions must be grounded in industry practice, not local reasoning.
+- Alternatives considered (industry practice, leading implementations)
+- How they compare (table when ≥3 options; dimensions come from the design goals)
+- Why the Section 2 solution wins
+- **Risks of the chosen solution** — both kinds, both required:
+  - **Type A — cost of choosing**: trade-offs accepted by picking this over the others
+  - **Type B — intrinsic fragility**: weaknesses of the solution itself (key assumptions, single points of failure, scale cliffs) — present even if no alternative existed
+  - State impact scope and mitigation per risk.
 
-Goals must be verifiable. How to express them depends on the change type:
-
-**For user-facing features** — write each goal as a User Story:
-```
-As a <specific role>,
-I want to <behavior, not a feature>,
-so that <the value or outcome>.
-```
-Each User Story must include **Acceptance Criteria** covering three paths:
-- **Happy path**: the core scenario works correctly
-- **Edge case**: boundary conditions (empty, max-length, concurrent)
-- **Error path**: how the system responds on failure
-
-Use Given/When/Then format for AC — each criterion must be independently testable.
-
-Self-check before moving on:
-1. If you swap the Role for a different user type, does the Story still hold? If yes, the Role is too generic.
-2. Remove "so that" — does the team still know why this feature exists? If not, rewrite it.
-3. Can each AC be written as a standalone test case? If not, the AC is too vague.
-4. List all roles that interact with this feature (users, admins, downstream systems, ops). Does each role have at least one Story? If not, the Goals are incomplete.
-
-*Example:*
-> As a data analyst,
-> I want to search metrics by keyword from the CLI,
-> so that I can quickly locate a metric without knowing its exact name.
->
-> Acceptance Criteria:
-> - Given keyword "gmv", When running `metric search gmv`, Then stdout returns a list containing "gmv" (JSON format)
-> - Given no matches, Then stdout returns `[]`, exit code 0
-> - Given network timeout, Then stderr outputs error message, exit code 1
-
-**For technical changes** (refactoring, performance, infrastructure) — write verifiable technical targets directly. User Story format is not required and should not be forced.
-
-*Example:* "Reduce p99 API latency from 800ms to under 200ms under 1000 concurrent requests"
-
-Non-goals are more important than goals — they prevent scope creep.
-- How to identify non-goals: (a) requirements stakeholders might request but are excluded this time, (b) natural extensions of adjacent problems, (c) boundaries where the team has divergent opinions.
-- Litmus test: if a non-goal is something nobody would do anyway, it carries no information — delete it.
-
-**3. Architecture Overview** (diagram required — ASCII art, Mermaid, or any text-based format)
-- **Draw an architecture diagram (ASCII art, Mermaid, or any text-based format). This section is not complete without one** — prose description alone is not acceptable.
-- Draw the full system, highlight incremental changes (solid lines = existing, bold/dashed = new/modified, gray/strikethrough = removed).
-- Group by responsibility, not by code structure.
-- Only draw the layers the reader needs to understand. If the change is application-level, infrastructure is just a labeled box.
-- Arrows show dependency direction; label the interaction type (sync call / async event / polling).
-
-**4. Core Flows** (sequence or flow diagram required — ASCII art, Mermaid, or any text-based format)
-- **Draw a sequence or flow diagram for each core flow (ASCII art, Mermaid, or any text-based format). This section is not complete without one** — skip only if the entire flow is a single linear step with no branching, error path, or concurrency.
-- Participants are **modules / services / roles**, not classes or functions.
-- Only main path + 1-2 critical error paths.
-- Granularity rule: **no function names should appear**. Write "auth service validates request", not `authService.validate()`.
-
-**5. Key Decisions & Alternatives** — **Before writing this section**, research industry best practices and leading implementations via web search. Reference the findings when explaining the rationale — decisions should be grounded in real-world evidence, not just local reasoning. For each decision: title states what was chosen (and what was not), body explains the rationale and key benefits, followed by "Alternatives Considered" summarizing rejected options and why. Use a comparison table only when there are ≥3 options that need multi-dimension comparison. Dimensions come from the design goals — they are not a generic checklist. If a decision has no tradeoff (only one reasonable option), it doesn't belong here.
-
-*Narrative example (for binary decisions):*
-
-> #### Tasks Stored as JSON Files, Not In-Memory
->
-> Tasks are persisted as JSON files in a `.tasks/` directory. This has three critical benefits: (1) tasks survive process crashes, (2) multiple agents can read/write the same directory for coordination without shared memory, (3) humans can inspect and edit task files for debugging.
->
-> **Alternatives Considered**: In-memory storage is simpler but loses state on crash and doesn't work across processes. A database (SQLite, Redis) provides ACID and better concurrency but adds a dependency and operational complexity. Files are the zero-dependency persistence layer that works everywhere.
-
-*Table example (for ≥3 options):*
-
-> | Dimension | Filesystem | In-Memory | SQLite |
-> |-----------|-----------|-----------|--------|
-> | Crash recovery | ✓ durable | ✗ lost | ✓ durable |
-> | Multi-process | ✓ shared dir | ✗ needs IPC | ✓ shared DB |
-> | Zero-dep deploy | ✓ | ✓ | ✗ needs driver |
-> | Debuggability | ✓ direct edit | ✗ needs tooling | △ needs SQL client |
-> | **Conclusion** | **✓** | | |
-
-**6. Risks & Open Questions** — For each risk: description → impact scope → mitigation idea. For open questions: note the expected decision timeline.
+**4. Open Questions (optional)** — keep only if research left items unresolved. For each: the question, decision timeline, decision owner. Omit the section if there are none.
 
 ## Part 2: Detail Design
 
-> **Prerequisite:** Part 1 (Overview Design) must be confirmed before writing this part. The confirmed overview stays at the top of this document as context — each section below should trace back to its architecture, flows, decisions, and goals.
+> **Prerequisite**: Overview confirmed. Each section traces back to a Goal, architecture, flow, or decision in the Overview.
 
-**1. Module Responsibilities & Interfaces** — Full contract, mark incremental changes. Existing interfaces: signature only. New/modified: full definition (params, return, errors, preconditions).
+**1. Module Responsibilities & Interfaces** — full contract per module. Existing interfaces: signature only. New or modified: full definition (parameters, return, errors, preconditions).
 
-**2. Data Model / Schema** — For each structure, answer: what is the structure (fields, types, optionality, defaults), what are the constraints (uniqueness, nullability, cross-field dependencies), how is it queried (indexes, common query patterns), how does it migrate (if modifying existing schema: migration path, backward compatibility, rollback).
+```
+TaskStore.acquire(taskId, agentId, ttl) -> Lease
+  pre:    taskId exists; no live lease on it
+  returns: Lease{ id, expiresAt }
+  errors: TaskNotFound, AlreadyLeased
+```
 
-**3. Core Algorithms / State Machines** — Only write what a competent engineer can't figure out in under 5 minutes from the requirements. State machines: transition diagrams with trigger conditions and side effects. Algorithms: pseudocode with complexity if performance-relevant. Document invariants — they are direct sources for test cases.
+**2. Data Model / Schema** — per structure: fields with types and defaults; constraints (uniqueness, nullability, cross-field rules); query patterns and indexes; migration path with rollback when changing existing schema.
 
-**4. Error Handling** — For each external interaction point (network, file IO, user input, cross-module calls), answer: how can it fail, how do we handle it (retry/degrade/propagate/ignore), how does the caller know.
+```
+table tasks(
+  id          uuid pk
+  status      enum('pending','running','done','failed') not null
+  lease_id    uuid null
+  updated_at  timestamptz not null
+) index (status, updated_at)
+invariant: status='running' ⇒ lease_id is not null
+```
 
-**5. Key Flows** — Same flows as overview, but with class/function-level participants, full parameter details, and all branches the implementer needs to know.
+**3. Core Algorithms / State Machines** — write only what a competent engineer cannot reconstruct in five minutes. State machines: transition diagrams with triggers and side effects. Algorithms: pseudocode plus complexity if performance matters. Document invariants — they become test cases.
 
-**6. Performance Estimation** (required when goals have quantitative targets) — Prove the design meets the goal without over-engineering. Estimate throughput/latency on the critical path. Stop when the goal is met — don't optimize for 500k when the target is 100k.
+```
+pending --start()--> running --finish()--> done
+                       │
+                       └--timeout()--> failed   (lease released)
+invariant: at most one running lease per task
+```
 
-**7. Testing Strategy** — Answer three questions: what to test (which modules/flows, prioritize core invariants), how to test (unit/integration/E2E split, where to draw mock boundaries and why), pass criteria (trace back to design goals).
+**4. Error Handling** — for each external interaction (network, IO, user input, cross-module call): failure modes, handling (retry / degrade / propagate / ignore), and what the caller observes.
 
-**8. Migration & Compatibility** (when modifying existing systems) — Migration steps and order, canary/rollback plan, compatibility during coexistence.
+```
+call           failure          handling          caller sees
+storage.write  transient IO     retry x3 jitter   ok | PersistError
+payment.api    timeout          fail-fast         PaymentTimeout
+```
+
+**5. Implementation Flows** — the Overview flows at function-level granularity, only when the implementer needs more detail. Show class/function names, parameters, every branch. If the Overview flow already suffices, write "see Overview" and skip.
+
+```
+TaskController.start(req)
+  └─ TaskService.start(taskId, agentId)
+       ├─ TaskStore.acquire(taskId, agentId, ttl=30s)
+       │    └─ AlreadyLeased → 409
+       └─ Worker.dispatch(taskId)
+            └─ dispatch error → release lease, 500
+```
+
+**6. Performance Estimation** — required when Goals are quantitative. Estimate throughput / latency on the critical path. State input assumptions (QPS, payload size) and the bottleneck. Stop once the estimate clears the Goal.
+
+```
+target: p99 < 200ms at 1000 QPS
+path:   auth(3ms) + lookup(20ms) + work(80ms) + write(15ms) ≈ 118ms
+bottleneck: write under contention → connection pool ≥ 32
+```
+
+**7. Testing Strategy** — this section is the implementer's reference for writing code and tests. **Every Goal, core module, and core flow needs multiple test cases**, covering all three paths:
+
+| Path | Meaning |
+|------|---------|
+| **Happy** | Smallest verification of the main scenario |
+| **Edge** | Boundaries (empty, max, concurrency, zero, null) |
+| **Error** | How failure is observed (exception, fallback, error return) |
+
+Each test case specifies:
+- **Input** — concrete values or preconditions (not "a user calls in")
+- **Expected** — observable output / state / side effect (not "should work")
+- **Level** — unit / integration / e2e (pick one)
+
+**Mock boundaries with rationale** — list what is mocked and what is not, and why each boundary was drawn there (e.g., "DB not mocked: schema constraints are a key test point. External payment service mocked: covered by contract tests.").
+
+**Pass criteria** trace back to the Goal. Quantitative Goal → comparable numeric output. Behavioral Goal → assertion on observable state.
+
+```
+Goal: TaskStore prevents concurrent leases on the same task
+
+T1 happy   unit         acquire(t1, A) → Lease; expiresAt within ttl ±100ms
+T2 edge    integration  acquire(t1, A) || acquire(t1, B) → exactly one Lease,
+                        the other raises AlreadyLeased
+T3 error   unit         acquire(unknownId) → TaskNotFound
+T4 edge    integration  lease expires → next acquire succeeds; old lease invalid
+
+Mocks: storage not mocked (uniqueness is the test); clock mocked in T4.
+Pass:  all four pass; T2 repeated 100× with zero flakes.
+```
+
+**8. Migration & Compatibility** — required when modifying existing systems. Cover migration steps in order, canary / rollback plan, compatibility while old and new coexist.
+
+```
+1. add column status_v2 (nullable)
+2. dual-write v1 + v2 for 24h
+3. backfill v2 from v1
+4. switch readers to v2 (canary 1% → 100%)
+5. drop v1 after 7-day soak
+rollback: keep dual-write, revert reader switch.
+```
 
 ## Writing Principles
 
-1. Every section must trace back to a design goal. If it doesn't relate to any goal, delete it.
-2. If removing a paragraph still lets the reader make correct decisions, that paragraph shouldn't exist.
+1. Every section traces back to a Goal. If a paragraph relates to no Goal, delete it.
+2. If removing a paragraph still lets the reader make correct decisions, the paragraph should not exist.
 3. Record **why**, not **what**. Code is the authoritative "what".
-4. **Diagrams over prose — default to diagrams (ASCII art, Mermaid, or any text-based format).** Use text only to explain what isn't obvious from the diagram. Omitting a diagram requires an explicit reason (e.g., "single linear step, no branching").
-5. Expose uncertainty honestly. Hiding risks wastes reviewers' attention.
+4. **Diagrams over prose.** Use words only for what diagrams cannot show. Omitting a diagram requires an explicit reason ("single linear step, no branching").
+5. Expose uncertainty honestly. Hidden risks waste reviewers' attention.
