@@ -6,6 +6,25 @@ The document has two parts: **Overview** (why + what) confirmed first, then **De
 
 > **Apply Design Thinking Rules to every section.**
 
+> **Diagrams follow the C4 model** (Simon Brown). Mapping:
+> - Overview Architecture Diagram = Context (L1) + Container (L2) combined
+> - Detail Section 1 Component diagram = Component layer (L3)
+> - Detail Section 5 Implementation Flows = Dynamic at Component level
+>
+> Standard C4 box / arrow notation applies throughout (box: name + tech + responsibility; arrow: action + protocol).
+
+## Writing Principles
+
+1. Every section traces back to a Goal. If a paragraph relates to no Goal, delete it.
+2. If removing a paragraph still lets the reader make correct decisions, the paragraph should not exist.
+3. Record **why**, not **what**. Code is the authoritative "what".
+4. **Diagrams over prose.** Use words only for what diagrams cannot show. Omitting a diagram requires an explicit reason ("single linear step, no branching").
+5. **Diagram format selection** (applies to all diagrams in this guide — Overview and Detail alike):
+   - Simple flow (≤7 boxes, linear / tree-shaped call chain) → **ASCII** (zero tooling, diff-friendly, LLM reads it as 2D structure directly)
+   - System architecture, state machine, complex data flow (needs boundaries / colors / change markers) → **Mermaid** (GitHub renders natively since 2022; `subgraph` + `classDef` cover styling needs; source remains diff-friendly)
+   - **PlantUML**: escape hatch for cases Mermaid cannot express; reaching this tier usually means the diagram should be split instead
+6. Expose uncertainty honestly. Hidden risks waste reviewers' attention.
+
 ## Part 1: Overview Design
 
 **1. Problem & Goals**
@@ -16,8 +35,10 @@ The document has two parts: **Overview** (why + what) confirmed first, then **De
 **2. Solution Design** — presents **the chosen solution** (alternatives belong in Section 3).
 
 **Diagrams are required, and they come before prose.** Prose explains only what diagrams cannot — participant roles, dependency types, error-path triggers. Restating the diagram in words is grounds for review rejection.
-- **Architecture Diagram** — modules and dependency directions; mark added / modified / removed; stay above class/function level.
-- **Flow Diagrams** — one core flow (main path) and 1–2 edge flows (critical error / boundary paths). Participants are modules / services / roles. **No function names** — those belong in Detail.
+- **Architecture Diagram** — a single C4 diagram combining Context (L1) and Container (L2) in one view: external actors and external systems outside the boundary, internal containers inside, stay above class/function level. Beyond standard C4 conventions:
+  - Mark added / modified / removed via color or annotation
+  - Split into separate Context + Container diagrams when box count exceeds ~15, or when external ecosystem is itself the core complexity
+- **Flow Diagrams** — one core flow (main path) and 1–2 edge flows (critical error / boundary paths). Participants are modules / services / roles. **No function names** — those belong in Detail. Flows must show execution order (numbered steps or directed arrows), not just static dependencies.
 
 **3. Research & Comparison** — **web search is mandatory before writing this section.** Decisions must be grounded in industry practice, not local reasoning.
 - Alternatives considered (industry practice, leading implementations)
@@ -34,7 +55,11 @@ The document has two parts: **Overview** (why + what) confirmed first, then **De
 
 > **Prerequisite**: Overview confirmed. Each section traces back to a Goal, architecture, flow, or decision in the Overview.
 
-**1. Module Responsibilities & Interfaces** — full contract per module. Existing interfaces: signature only. New or modified: full definition (parameters, return, errors, preconditions).
+**1. Module Responsibilities & Interfaces**
+
+When the module has ≥3 sub-modules, **first show a C4 Component diagram** of its internal structure (mark added / modified / removed), then list per-component contracts. The diagram is the visual map; the contracts are the precise boundaries.
+
+Per-component contracts: full contract per component. Existing interfaces: signature only. New or modified: full definition (parameters, return, errors, preconditions).
 
 ```
 TaskStore.acquire(taskId, agentId, ttl) -> Lease
@@ -72,7 +97,11 @@ storage.write  transient IO     retry x3 jitter   ok | PersistError
 payment.api    timeout          fail-fast         PaymentTimeout
 ```
 
-**5. Implementation Flows** — the Overview flows at function-level granularity, only when the implementer needs more detail. Show class/function names, parameters, every branch. If the Overview flow already suffices, write "see Overview" and skip.
+**5. Implementation Flows** — a **C4 Dynamic diagram at component level**: function-level call sequences between Section 1's components, with class/function names, parameters, and every branch. Only when more detail than the Overview flow is needed; otherwise write "see Overview" and skip.
+
+For this section specifically (refining Writing Principles #5):
+- ≤2 branches or concurrent participants → ASCII call tree (compact, see example below)
+- ≥3 → Mermaid sequence diagram (clearer when branching gets dense)
 
 ```
 TaskController.start(req)
@@ -132,10 +161,3 @@ Pass:  all four pass; T2 repeated 100× with zero flakes.
 rollback: keep dual-write, revert reader switch.
 ```
 
-## Writing Principles
-
-1. Every section traces back to a Goal. If a paragraph relates to no Goal, delete it.
-2. If removing a paragraph still lets the reader make correct decisions, the paragraph should not exist.
-3. Record **why**, not **what**. Code is the authoritative "what".
-4. **Diagrams over prose.** Use words only for what diagrams cannot show. Omitting a diagram requires an explicit reason ("single linear step, no branching").
-5. Expose uncertainty honestly. Hidden risks waste reviewers' attention.
