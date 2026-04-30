@@ -16,7 +16,14 @@ The document has two parts: **Overview** (why + what) confirmed first, then **De
 **2. Solution Design** — presents **the chosen solution** (alternatives belong in Section 3).
 
 **Diagrams are required, and they come before prose.** Prose explains only what diagrams cannot — participant roles, dependency types, error-path triggers. Restating the diagram in words is grounds for review rejection.
-- **Architecture Diagram** — modules and dependency directions; mark added / modified / removed; stay above class/function level.
+- **Architecture Diagram** — answer three questions in one diagram: (1) what responsibility blocks exist, (2) how data/control flows between them, (3) where the key design decision lands. Rules:
+  - Unit of analysis is a **responsibility module or service** — never a file or function
+  - Arrows show data flow or call direction; label each arrow with what is passed or invoked
+  - Annotate the critical design decision directly on the diagram (e.g., "dispatch table — replaces if-elif chain")
+  - Mark added / modified / removed
+  - **Pass/fail test**: a reader who only reads the diagram (no prose) must be able to answer "how does this design achieve the goal?" If they cannot, the diagram is incomplete.
+  - ❌ File tree listing files and their new constants/functions — that is a change inventory, not an architecture
+  - ✅ Responsibility boxes with labeled arrows showing data flow and a callout on the key decision
 - **Flow Diagrams** — one core flow (main path) and 1–2 edge flows (critical error / boundary paths). Participants are modules / services / roles. **No function names** — those belong in Detail.
 
 **3. Research & Comparison** — **web search is mandatory before writing this section.** Decisions must be grounded in industry practice, not local reasoning.
