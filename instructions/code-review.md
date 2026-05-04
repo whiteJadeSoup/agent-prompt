@@ -9,7 +9,7 @@ Code review is executed by **3 parallel subagents + 1 orchestrator**. This reduc
 | Agent | Focus | Finding Types |
 |-------|-------|--------------|
 | **Agent A: Correctness & Safety** | Logic errors, security, concurrency, idempotency, backward compatibility, exception paths, resource management | Primarily `[blocking]` |
-| **Agent B: Quality & Resilience** | Error handling, performance, observability, impact on other paths, architecture compliance, maintainability | `[blocking]` or `[question]` |
+| **Agent B: Quality & Resilience** | Error handling, performance (hot path, IO patterns, scale cliffs, resource limits), observability, impact on other paths, architecture compliance, maintainability | `[blocking]` or `[question]` |
 | **Agent C: Clarity & Coverage** | Readability, abstraction consistency, test coverage, dead code/redundancy | `[question]`, `[suggestion]`, `[nit]` |
 
 ### Subagent Output Format
@@ -245,6 +245,14 @@ Work through the following questioning patterns before forming any judgment:
 
 *Example: A retry loop that is safe when idempotent, but causes double-charges when the underlying operation is not.*
 
+**What scale/load assumption is this code making?**
+- Hot path & complexity: is this code on a frequently called path? Any algorithmic complexity worse than necessary (O(n²) where O(n) suffices, unnecessary nesting, repeated work in tight loops)?
+- IO pattern: any N+1 queries, sync IO inside a loop, missing batching, missing cache where one obviously fits?
+- Scale cliff: works fine at today's data size — what happens at 10x? Any unbounded sort, full-table scan, or in-memory accumulation that fails silently as data grows?
+- Resource limits: connection pool / file descriptors / thread pool / memory — any new path that could exhaust these under load? Missing back-pressure on unbounded queues?
+
+*Example: A `getOrdersByUser()` that loads all orders into memory and filters in-app — works at 200/user, breaks at 10k/user with no warning.*
+
 **Does the fix hold at the boundary?**
 - The fix works for the described scenario. Does it also work for the adjacent scenario the PR doesn't mention?
 - Is there an off-by-one, a timezone edge, an encoding edge, a locale-specific behavior?
@@ -338,7 +346,10 @@ Every comment must be structured as follows:
 | **Readability** | Inaccurate names, missing comments on complex logic, functions doing more than one thing |
 | **Abstraction consistency** | High-level business logic and low-level implementation details mixed in the same function |
 | **Error handling** | External calls fail without proper handling; error messages are unclear |
-| **Performance** | Requests inside loops, N+1 queries, obvious performance traps |
+| **Hot path & complexity** | Algorithmic complexity worse than needed on frequently-called paths (O(n²) where O(n) suffices, unnecessary nesting, repeated work in tight loops) |
+| **IO patterns** | N+1 queries, sync IO inside a loop, missing batching, missing cache where one obviously fits |
+| **Scale cliff** | Code that works at current data size but degrades sharply at 10x — unbounded sorts, full-table scans, in-memory accumulation that grows with input |
+| **Resource limits** | Connection pool / file descriptors / thread pool / memory exhaustion under load; missing back-pressure on unbounded queues |
 | **Observability** | Missing logs for key operations, incorrect log levels |
 | **Test coverage** | Core logic untested; bug fixes missing regression tests |
 | **Dead code / redundancy** | Unreachable code, duplicated logic, unused variables |
