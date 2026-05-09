@@ -346,10 +346,10 @@ Every comment must be structured as follows:
 | **Readability** | Inaccurate names, missing comments on complex logic, functions doing more than one thing |
 | **Abstraction consistency** | High-level business logic and low-level implementation details mixed in the same function |
 | **Error handling** | External calls fail without proper handling; error messages are unclear |
-| **Hot path & complexity** | Algorithmic complexity worse than needed on frequently-called paths (O(n²) where O(n) suffices, unnecessary nesting, repeated work in tight loops) |
-| **IO patterns** | N+1 queries, sync IO inside a loop, missing batching, missing cache where one obviously fits |
-| **Scale cliff** | Code that works at current data size but degrades sharply at 10x — unbounded sorts, full-table scans, in-memory accumulation that grows with input |
-| **Resource limits** | Connection pool / file descriptors / thread pool / memory exhaustion under load; missing back-pressure on unbounded queues |
+| **Performance — hot path & complexity** | Algorithmic complexity worse than needed on frequently-called paths (O(n²) where O(n) suffices, unnecessary nesting, repeated work in tight loops) |
+| **Performance — IO patterns** | N+1 queries, sync IO inside a loop, missing batching, missing cache where one obviously fits |
+| **Performance — scale cliff** | Code that works at current data size but degrades sharply at 10x — unbounded sorts, full-table scans, in-memory accumulation that grows with input |
+| **Performance — resource limits** | Connection pool / file descriptors / thread pool / memory exhaustion under load; missing back-pressure on unbounded queues |
 | **Observability** | Missing logs for key operations, incorrect log levels |
 | **Test coverage** | Core logic untested; bug fixes missing regression tests |
 | **Dead code / redundancy** | Unreachable code, duplicated logic, unused variables |
