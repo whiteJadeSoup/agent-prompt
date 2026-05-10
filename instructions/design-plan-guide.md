@@ -35,15 +35,18 @@ The document has two parts: **Overview** (why + what) confirmed first, then **De
 **2. Solution Design** — presents **the chosen solution** (alternatives belong in Section 3).
 
 **Diagrams are required, and they come before prose.** Prose explains only what diagrams cannot — participant roles, dependency types, error-path triggers. Restating the diagram in words is grounds for review rejection.
-- **Architecture Diagram** — a single C4 diagram combining Context (L1) and Container (L2) in one view: external actors and external systems outside the boundary, internal containers inside, stay above class/function level. The diagram must answer three questions: (1) what responsibility blocks exist, (2) how data/control flows between them, (3) where the key design decision lands. Rules:
+- **Architecture Diagram** — a single C4 diagram combining Context (L1) and Container (L2) in one view: external actors and external systems outside the boundary, internal containers inside, stay above class/function level. The diagram must answer three questions: (1) what responsibility blocks exist, (2) **what data flows where, and why**, (3) where the key design decision lands. Rules:
   - Unit of analysis is a **responsibility module or service** — never a file or function
-  - Arrows show data flow or call direction; label each arrow with what is passed or invoked
+  - **Each box must list "core design" — 3–6 what-level bullets** (responsibilities, key constraints, traceability IDs back to Goals / Risks). **Do not write how-level details** (algorithms, thresholds, field formats, function signatures) — those belong in Detail Design. Examples: ✅ `行号化输出` · `read-gate (G3)` · `staleness 检查 (B2)`; ❌ `cat -n 输出 (lineno + tab + content)` · `> 256KB 拒` · `stored mtime != FS mtime → 拒`
+  - **Arrows carry data flow with both payload and purpose**: each label takes the form `<what data> / <purpose>` (e.g., `path / read-gate check`, `user profile / authz check`). Bare verbs (`updateUser()`) or pure call directions are insufficient — a reader looking at any single arrow alone must know what crosses it and why
+  - **Numbered execution sequence (⓪①②③) is optional**: use it when the design has a natural temporal flow that helps the reader follow the main path; skip for purely static structures or multi-entry systems where one sequence cannot represent all paths
   - Annotate the critical design decision directly on the diagram (e.g., "dispatch table — replaces if-elif chain")
   - Mark added / modified / removed via color or annotation
   - Split into separate Context + Container diagrams when box count exceeds ~15, or when external ecosystem is itself the core complexity
   - **Pass/fail test**: a reader who only reads the diagram (no prose) must be able to answer "how does this design achieve the goal?" If they cannot, the diagram is incomplete.
   - ❌ File tree listing files and their new constants/functions — that is a change inventory, not an architecture
-  - ✅ Responsibility boxes with labeled arrows showing data flow and a callout on the key decision
+  - ❌ Boxes labeled only with names; arrows labeled only with verbs or call sites
+  - ✅ Responsibility boxes with what-level core design bullets, arrows labeled `data / purpose`, and a callout on the key decision
 - **Flow Diagrams** — one core flow (main path) and 1–2 edge flows (critical error / boundary paths). Participants are modules / services / roles. **No function names** — those belong in Detail. Flows must show execution order (numbered steps or directed arrows), not just static dependencies.
 
 **3. Research & Comparison** — **web search is mandatory before writing this section.** Decisions must be grounded in industry practice, not local reasoning.
