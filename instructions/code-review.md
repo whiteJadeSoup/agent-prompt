@@ -1,27 +1,29 @@
 # Code Review Guide
 
-## Part 0: Review Architecture (Multi-Agent Execution)
+## Part 0: Review Architecture (Sequential Multi-Pass Execution)
 
-Code review is executed by **3 parallel subagents + 1 orchestrator**. This reduces review time and ensures each concern gets dedicated focus.
+Code review is executed by **a single reviewer running 3 sequential passes in the same conversation context**, followed by a synthesis step. The reviewer loads the PR diff + this guide once, then audits the diff from three different angles in turn.
 
-### Subagent Responsibilities
+**Do not spawn sub-agents — they don't share the parent's cache, so parallel sub-agents would re-process this prefix 3 times. That's why passes run inline.**
 
-| Agent | Focus | Finding Types |
-|-------|-------|--------------|
-| **Agent A: Correctness & Safety** | Logic errors, security, concurrency, idempotency, backward compatibility, exception paths, resource management | Primarily `[blocking]` |
-| **Agent B: Quality & Resilience** | Error handling, performance (hot path, IO patterns, scale cliffs, resource limits), observability, impact on other paths, architecture compliance, maintainability | `[blocking]` or `[question]` |
-| **Agent C: Clarity & Coverage** | Readability, abstraction consistency, test coverage, dead code/redundancy | `[question]`, `[suggestion]`, `[nit]` |
+### Pass Responsibilities
 
-### Subagent Output Format
+| Pass | Focus | Finding Types |
+|------|-------|--------------|
+| **Pass A: Correctness & Safety** | Logic errors, security, concurrency, idempotency, backward compatibility, exception paths, resource management | Primarily `[blocking]` |
+| **Pass B: Quality & Resilience** | Error handling, performance (hot path, IO patterns, scale cliffs, resource limits), observability, impact on other paths, architecture compliance, maintainability | `[blocking]` or `[question]` |
+| **Pass C: Clarity & Coverage** | Readability, abstraction consistency, test coverage, dead code/redundancy | `[question]`, `[suggestion]`, `[nit]` |
 
-Each subagent must output a structured findings list. Free-text comments are not allowed at this stage.
+### Pass Output Format
+
+Each pass must output a structured findings list. Free-text comments are not allowed at this stage.
 
 ```json
 {
+  "pass": "A",
   "findings": [
     {
       "id": "A-001",
-      "agent": "A",
       "location": "UserService.java:87",
       "severity": "blocking",
       "angle": "security",
@@ -36,28 +38,34 @@ Each subagent must output a structured findings list. Free-text comments are not
 
 **Proof must be executable**: specify exact inputs, call sequence, or concurrent timing. If you cannot construct a concrete proof, set `severity` to `question`, never `blocking`.
 
-### Orchestrator Responsibilities
+### Execution Protocol
 
-**Before dispatching subagents**, the orchestrator must inject the full review context into each subagent's prompt. Subagents do not have access to this guide automatically — they only know what the orchestrator tells them. Each subagent prompt must include:
-- The PR identifier (number or branch) — subagents read the code themselves
-- The agent's assigned focus area (from the table above)
-- The **complete contents of this code review guide** (Parts 1–4), so the subagent applies the same skeptical mindset, diagram requirements, comment format, label definitions, and angles table
-- The **output format** (JSON findings schema above)
-
-After all 3 subagents complete, the orchestrator:
-1. **Deduplicates**: if multiple agents flag the same location for the same reason, keep the highest-severity finding and merge the rationale
-2. **Resolves conflicts**: if agents disagree on severity for the same finding, use Agent A's judgment for correctness/security issues, Agent B's for quality issues
-3. **Formats**: converts structured findings into the comment format defined in Step 4
-4. **Concludes**: writes a mandatory conclusion (Approve / Request Changes / Comment)
+1. **Load once**: read the PR diff, surrounding code, and this guide (Parts 1–4) into context. Subsequent passes reuse this prefix from cache, which is why nothing should be re-read between passes.
+2. **Run Pass A**: apply the skeptical mindset (Part 2, Step 2) through the lens of Correctness & Safety only. Output Pass A's JSON findings block.
+3. **Run Pass B**: re-scan the same diff through the lens of Quality & Resilience. Do not re-raise findings already in Pass A — extend with new ones. Output Pass B's JSON findings block.
+4. **Run Pass C**: re-scan through the lens of Clarity & Coverage. Output Pass C's JSON findings block.
+5. **Synthesize**:
+   - **Deduplicate**: if two passes flag the same location for the same reason, keep the highest-severity finding and merge the rationale.
+   - **Resolve conflicts**: if passes disagree on severity for the same finding, Pass A's judgment wins for correctness/security issues; Pass B's wins for quality issues.
+   - **Format**: convert structured findings into the comment format defined in Part 2, Step 4.
+   - **Conclude**: write a mandatory conclusion (Approve / Request Changes / Comment).
 
 ### Execution Flow
 
 ```
-PR Diff
-  ├─→ Agent A (correctness & safety) ─┐
-  ├─→ Agent B (quality & resilience) ─┼─→ Orchestrator → Final Review
-  └─→ Agent C (clarity & coverage)  ─┘
-         [parallel]                        [sequential]
+PR Diff + Guide  [loaded once into context — cached for passes B and C]
+       │
+       ▼
+   Pass A (correctness & safety)  → findings JSON
+       │
+       ▼
+   Pass B (quality & resilience)  → findings JSON   [reuses cached prefix]
+       │
+       ▼
+   Pass C (clarity & coverage)    → findings JSON   [reuses cached prefix]
+       │
+       ▼
+   Synthesis → Final Review        (dedup, conflict resolution, format, conclude)
 ```
 
 ---
@@ -93,12 +101,9 @@ Go through the diff yourself:
 
 **Background** — Describe the scenario, not the solution.
 
-❌ "Added modelId to modelBasicInfo"
 ✅ "When running `model update`, even if only field bindings are changed, the API returns a duplicate name error"
 
 **Root Cause** — Trace to the actual cause, not just the symptom. Point to the specific code responsible, and explain how you confirmed it is the cause. **Draw a diagram (architecture, sequence, flow, call chain, or state — using ASCII art, Mermaid, or any other text-based format) unless the entire root cause fits in one sentence with no branching.** Prose alone is not acceptable for multi-step or conditional causes.
-
-❌ "modelId was not passed"
 
 ✅
 > `ModelService.java:142` was missing `modelId` in the `modelBasicInfo` object it constructs. This causes the duplicate name check to always treat the current model as a stranger:
@@ -113,8 +118,6 @@ Go through the diff yourself:
 > Confirmed by adding a log at `ModelService.java:142` to print `modelBasicInfo.getModelId()` — it printed `null` on every update request, regardless of the actual model ID.
 
 **Solution Overview** — Explain *what* you chose to fix and *why* at that layer, not *how* (the code is the how). **Draw a diagram (architecture, sequence, flow, call chain, or state — using ASCII art, Mermaid, or any other text-based format) showing the corrected path — required unless the fix is a single-line change with no structural effect.** The reviewer must understand the approach from the diagram before reading the diff. List rejected alternatives and why they were ruled out.
-
-❌ "Added modelId to `modelBasicInfo`"
 
 ✅
 > Populate `modelId` in `ModelService.buildBasicInfo()` so the duplicate name checker can correctly exclude the current model from comparison. Fix at the construction site rather than inside the checker — the checker should remain a pure validator that assumes valid input.
@@ -132,15 +135,13 @@ Go through the diff yourself:
 
 **Changes** — What changed AND what did not change. "What did not change" tells the reviewer where the boundary is.
 
-❌ Only: "Added modelId to modelBasicInfo"
-✅ Also: "Does not affect the create path (create uses independent logic)"
+✅ "Added modelId to modelBasicInfo; does not affect the create path (create uses independent logic)"
 
 **Verification** — Two parts are required:
 
 1. **Fix verification** — Show that the root cause scenario no longer reproduces. Paste actual commands and outputs.
 2. **Regression verification** — Show that unaffected paths still work. Cover the paths most likely to be disturbed by the change.
 
-❌ "Tested, works fine"
 ✅
 ```
 # Fix verification
@@ -151,54 +152,6 @@ $ curl -X PUT /model/123 -d '{"bindings": [...]}'
 $ curl -X POST /model -d '{"name": "new-model", ...}'
 → 201 Created
 ```
-
-*Example of a complete, well-written PR description:*
-
-> ## Background
-> When running `model update` to change only field bindings (no name change), the API returns a 409 duplicate name error. This blocks any binding-only update on an existing model.
->
-> ## Root Cause
-> `ModelService.buildBasicInfo()` (`ModelService.java:138`) constructs the `modelBasicInfo` object but never assigns `modelId`. The downstream duplicate name check then compares `null` against every existing model ID, making it impossible to exclude the current model from the check:
-> ```
-> PUT /model/123 (update bindings only)
->   └─ ModelService.buildBasicInfo()       [ModelService.java:138]
->        └─ modelBasicInfo.modelId = null    ← missing assignment
->             └─ DuplicateNameChecker.check(modelBasicInfo)
->                  └─ !Objects.equals(null, m.getId())  → always true
->                       └─ throws DuplicateNameException  ← wrong
-> ```
-> Confirmed by logging `modelBasicInfo.getModelId()` at line 142 — printed `null` on every update request regardless of actual model ID.
->
-> ## Solution Overview
-> Populate `modelId` in `ModelService.buildBasicInfo()` so the checker can correctly exclude the current model. Fix at the construction site rather than inside the checker — the checker should remain a pure validator that assumes valid input.
-> ```
-> PUT /model/123 (update bindings only)
->   └─ ModelService.buildBasicInfo()       [ModelService.java:138]
->        └─ modelBasicInfo { modelId: "123" }   ← assigned here
->             └─ DuplicateNameChecker.check(modelBasicInfo)
->                  └─ !Objects.equals("123", m.getId())  → false for self
->                       └─ passes correctly
-> ```
-> **Alternatives considered**: add `if (modelId == null) return false` in `DuplicateNameChecker` — rejected because it silently swallows missing IDs instead of surfacing the real problem.
->
-> ## Changes
-> - `ModelService.java:142`: assign `modelId` when constructing `modelBasicInfo`
-> - Does not affect the create path — create calls `buildCreateInfo()`, which is independent logic and untouched by this change
->
-> ## Verification
-> ```
-> # Fix verification: binding-only update no longer returns 409
-> $ curl -X PUT /model/123 -d '{"bindings": [{"fieldId": 1}]}'
-> → 200 OK  (previously: 409 Duplicate name error)
->
-> # Regression: name conflict detection still works
-> $ curl -X PUT /model/123 -d '{"name": "existing-model-name"}'
-> → 409 Duplicate name error  (expected, name genuinely conflicts)
->
-> # Regression: create path unaffected
-> $ curl -X POST /model -d '{"name": "new-model", "bindings": [...]}'
-> → 201 Created
-> ```
 
 **Level of detail by change type:**
 

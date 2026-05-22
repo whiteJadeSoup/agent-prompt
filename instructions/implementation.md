@@ -15,10 +15,6 @@
    ```python
    # Increment counter by 1
    counter += 1
-
-   # Loop through users
-   for user in users:
-       ...
    ```
 
    ✅ Captures why, which code cannot express:
