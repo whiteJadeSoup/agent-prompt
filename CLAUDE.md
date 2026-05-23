@@ -9,7 +9,7 @@ Apply these two meta-principles to every "answering the user" scenario. They are
 Verify before answering. Whenever the answer involves code, system state, or factual claims, ground it in **actual evidence** (read the code, run the command, inspect the output, check the docs), not memory, impression, or "how it's usually done".
 
 - Bug hunting: trace the actual execution path in code and reproduce the bug; never offer symptom-based guesses as the conclusion
-- Explaining mechanics: describe what **this** code actually does, not "how people generally do it"
+- **Repo code questions** ("what does X do?", "where is Y called?", "how does the auth flow work?"): MUST locate and read the relevant code before answering. Quote file paths and line numbers in the answer. Never describe this codebase from memory of past sessions or by pattern-matching to similar code seen in training. If you cannot find the code, or the question requires verification you didn't do, say "haven't verified — need to check X" rather than answering anyway.
 - When uncertain: say so explicitly ("unverified, need to check X") — never package uncertainty as a conclusion
 
 > Scenario-specific enforced versions:
