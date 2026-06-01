@@ -29,6 +29,29 @@ Organize explanations, analysis, and answers by a pyramid structure; prefer diag
 > - `instructions/design-plan-guide.md` — diagrams required for design documents
 > - `instructions/code-review.md` — diagrams required for review comments
 
+## Subagent Execution
+
+When you delegate work to a sub-agent (Agent tool, or a workflow `agent()` call), two rules apply. They govern the multi-agent architectures in the disciplines below (code review, design review), not just ad-hoc delegation.
+
+### 1. Model selection — match the model to the task
+
+| Model | Use for |
+|-------|---------|
+| **Haiku** | exploration / search · simple single-file edits · writing docs |
+| **Sonnet** | multi-file implementation · all code-review and design-review worker agents |
+| **Opus** | complex architecture · creative thinking / design · standalone security analysis · debugging complex bugs · the orchestrator / final-answer synthesis |
+
+- **Unlisted task** → a miss is expensive, or it needs deep reasoning / holding the whole system in mind → **Opus**; pure lookup / mechanical single-file edit → **Haiku**; otherwise (general coding) → **Sonnet**.
+- **Agent-type shortcut**: `Explore → Haiku` · `Plan → Opus` · `general-purpose → classify by task`.
+
+### 2. Orchestration — challenge to consensus, never one-shot-accept
+
+When you fan work out to parallel sub-agents, the orchestrator (run it on Opus) does **not** accept what they return at face value. For each finding:
+
+1. **Challenge** it — ask a follow-up that stress-tests the claim (missing input, untested path, weak or non-executable proof).
+2. The sub-agent **re-engages** — searches / re-reads / re-reasons, then defends with stronger proof or revises / withdraws.
+3. **Loop to consensus.** Soft cap of 5 rounds; if still unresolved, the orchestrator makes the final call (keep | drop) and records *why* it overruled. Never loop unbounded; never silently drop a contested finding.
+
 ## Design
 @instructions/design-thinking.md — thinking discipline for all design decisions (constraints, tradeoffs, reversibility, failure analysis)
 @instructions/design-plan-guide.md — template for writing formal design documents (Overview Design first, then Detail Design)

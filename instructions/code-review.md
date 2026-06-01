@@ -1,29 +1,29 @@
 # Code Review Guide
 
-## Part 0: Review Architecture (Sequential Multi-Pass Execution)
+## Part 0: Review Architecture (Multi-Agent Execution)
 
-Code review is executed by **a single reviewer running 3 sequential passes in the same conversation context**, followed by a synthesis step. The reviewer loads the PR diff + this guide once, then audits the diff from three different angles in turn.
+Code review is executed by **3 parallel sub-agents + 1 orchestrator**. The sub-agents run concurrently, each focused on one concern; the orchestrator interrogates their findings and synthesizes the review. Model assignment follows the **Subagent Execution** umbrella in `CLAUDE.md`.
 
-**Do not spawn sub-agents — they don't share the parent's cache, so parallel sub-agents would re-process this prefix 3 times. That's why passes run inline.**
+### Sub-agent Responsibilities
 
-### Pass Responsibilities
+| Agent | Focus | Model | Finding Types |
+|-------|-------|-------|--------------|
+| **Agent A: Correctness & Safety** | Logic errors, security, concurrency, idempotency, backward compatibility, exception paths, resource management | Sonnet | Primarily `[blocking]` |
+| **Agent B: Quality & Resilience** | Error handling, performance (hot path, IO patterns, scale cliffs, resource limits), observability, impact on other paths, architecture compliance, maintainability | Sonnet | `[blocking]` or `[question]` |
+| **Agent C: Clarity & Coverage** | Readability, abstraction consistency, test coverage, dead code/redundancy | Sonnet | `[question]`, `[suggestion]`, `[nit]` |
 
-| Pass | Focus | Finding Types |
-|------|-------|--------------|
-| **Pass A: Correctness & Safety** | Logic errors, security, concurrency, idempotency, backward compatibility, exception paths, resource management | Primarily `[blocking]` |
-| **Pass B: Quality & Resilience** | Error handling, performance (hot path, IO patterns, scale cliffs, resource limits), observability, impact on other paths, architecture compliance, maintainability | `[blocking]` or `[question]` |
-| **Pass C: Clarity & Coverage** | Readability, abstraction consistency, test coverage, dead code/redundancy | `[question]`, `[suggestion]`, `[nit]` |
+Security is an angle inside Agent A and runs on Sonnet like the rest of the review — the Opus orchestrator's challenge loop (below) is its safety net. The umbrella's `standalone security analysis → Opus` is for a dedicated security audit, not the security angle embedded here.
 
-### Pass Output Format
+### Sub-agent Output Format
 
-Each pass must output a structured findings list. Free-text comments are not allowed at this stage.
+Each sub-agent must output a structured findings list. Free-text comments are not allowed at this stage.
 
 ```json
 {
-  "pass": "A",
   "findings": [
     {
       "id": "A-001",
+      "agent": "A",
       "location": "UserService.java:87",
       "severity": "blocking",
       "angle": "security",
@@ -38,34 +38,42 @@ Each pass must output a structured findings list. Free-text comments are not all
 
 **Proof must be executable**: specify exact inputs, call sequence, or concurrent timing. If you cannot construct a concrete proof, set `severity` to `question`, never `blocking`.
 
-### Execution Protocol
+### Orchestrator Responsibilities
 
-1. **Load once**: read the PR diff, surrounding code, and this guide (Parts 1–4) into context. Subsequent passes reuse this prefix from cache, which is why nothing should be re-read between passes.
-2. **Run Pass A**: apply the skeptical mindset (Part 2, Step 2) through the lens of Correctness & Safety only. Output Pass A's JSON findings block.
-3. **Run Pass B**: re-scan the same diff through the lens of Quality & Resilience. Do not re-raise findings already in Pass A — extend with new ones. Output Pass B's JSON findings block.
-4. **Run Pass C**: re-scan through the lens of Clarity & Coverage. Output Pass C's JSON findings block.
-5. **Synthesize**:
-   - **Deduplicate**: if two passes flag the same location for the same reason, keep the highest-severity finding and merge the rationale.
-   - **Resolve conflicts**: if passes disagree on severity for the same finding, Pass A's judgment wins for correctness/security issues; Pass B's wins for quality issues.
-   - **Format**: convert structured findings into the comment format defined in Part 2, Step 4.
-   - **Conclude**: write a mandatory conclusion (Approve / Request Changes / Comment).
+The orchestrator runs on **Opus**.
+
+**Before dispatching sub-agents**, inject the full review context into each sub-agent's prompt — they do not have this guide automatically, they only know what the orchestrator tells them. Each prompt must include:
+- The PR identifier (number or branch) — sub-agents read the code themselves
+- The agent's assigned focus area (from the table above)
+- The **complete contents of this code review guide** (Parts 1–4), so the sub-agent applies the same skeptical mindset, diagram requirements, comment format, label definitions, and angles table
+- The **output format** (JSON findings schema above)
+
+**After the sub-agents return, challenge before accepting** — do not one-shot-accept. For each finding:
+1. **Challenge** — ask a follow-up that stress-tests the claim: is the proof actually executable? what about input X, path Y, or concurrent timing Z? does the severity hold?
+2. The sub-agent **re-engages** — searches / re-reads the code / re-reasons, then defends with stronger proof or revises / withdraws the finding.
+3. **Loop to consensus.** Soft cap of 5 rounds per finding; if still unresolved, the orchestrator makes the final call (keep | drop) and records *why* it overruled. Never loop unbounded; never silently drop a contested finding.
+
+Once the findings reach consensus, the orchestrator:
+1. **Deduplicates**: if multiple agents flag the same location for the same reason, keep the highest-severity finding and merge the rationale
+2. **Resolves conflicts**: if agents disagree on severity, use Agent A's judgment for correctness/security issues, Agent B's for quality issues
+3. **Formats**: converts structured findings into the comment format defined in Step 4
+4. **Concludes**: writes a mandatory conclusion (Approve / Request Changes / Comment)
 
 ### Execution Flow
 
 ```
-PR Diff + Guide  [loaded once into context — cached for passes B and C]
-       │
-       ▼
-   Pass A (correctness & safety)  → findings JSON
-       │
-       ▼
-   Pass B (quality & resilience)  → findings JSON   [reuses cached prefix]
-       │
-       ▼
-   Pass C (clarity & coverage)    → findings JSON   [reuses cached prefix]
-       │
-       ▼
-   Synthesis → Final Review        (dedup, conflict resolution, format, conclude)
+PR Diff
+  ├─→ Agent A (correctness & safety)  ─ Sonnet ┐
+  ├─→ Agent B (quality & resilience)  ─ Sonnet ├─ parallel
+  └─→ Agent C (clarity & coverage)    ─ Sonnet ┘
+                  │ findings JSON
+                  ▼
+        Orchestrator ─ Opus
+          challenge ↔ sub-agent re-engages   (loop ≤ 5 → consensus,
+                                               else decide + record why)
+          dedup · resolve · format · conclude
+                  ▼
+            Final Review
 ```
 
 ---

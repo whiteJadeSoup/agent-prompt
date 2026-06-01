@@ -18,38 +18,26 @@ If source 1 is confirmed, stop reviewing — the plan needs to restart. Evaluati
 
 ---
 
-## Execution Architecture (Sequential Multi-Pass)
+## Execution Architecture (Multi-Agent)
 
-Overview Review is executed by **a single reviewer running 3 sequential passes in the same conversation context**, followed by a synthesis step. Each pass owns one source of regret.
+Overview Review is executed by **3 parallel sub-agents + 1 orchestrator**. Each sub-agent owns one source of regret and runs concurrently; the orchestrator interrogates their findings and synthesizes the review. Model assignment follows the **Subagent Execution** umbrella in `CLAUDE.md`.
 
-**Do not spawn sub-agents — they don't share the parent's cache, so parallel sub-agents would re-process this prefix 3 times. That's why passes run inline.**
+| Agent | Regret Source | Model | Core Question |
+|-------|--------------|-------|---------------|
+| **Agent A: Problem** | Wrong problem | Sonnet | Does this plan solve the right problem for the right people? |
+| **Agent B: Direction** | Wrong direction | Sonnet | Can this approach actually achieve the stated goals? |
+| **Agent C: Reality** | Unrecognized reality | Sonnet | What hidden assumptions or constraints could invalidate this plan? |
 
-| Pass | Regret Source | Core Question |
-|------|--------------|---------------|
-| **Pass A: Problem** | Wrong problem | Does this plan solve the right problem for the right people? |
-| **Pass B: Direction** | Wrong direction | Can this approach actually achieve the stated goals? |
-| **Pass C: Reality** | Unrecognized reality | What hidden assumptions or constraints could invalidate this plan? |
+**Before dispatching sub-agents**, the orchestrator injects into each prompt: the design document identifier (sub-agents read the document themselves), the agent's assigned focus area and core question, the complete contents of this review guide, and the JSON output schema below.
 
-### Execution Protocol
-
-1. **Load once**: read the design document and this review guide into context. Subsequent passes reuse this prefix from cache — do not re-read the document between passes.
-2. **Run Pass A** (Wrong Problem) → output JSON findings block.
-3. **Run Pass B** (Wrong Direction) → output JSON findings block. Do not re-raise findings already in Pass A.
-4. **Run Pass C** (Unrecognized Reality) → output JSON findings block.
-5. **Synthesize**:
-   - **Deduplicate**: same location + same reason → keep highest severity, merge rationale
-   - **Resolve conflicts**: Pass A's judgment takes priority for problem-level issues, Pass B's for direction-level
-   - **Format**: convert findings into the comment format below
-   - **Conclude**: write a mandatory conclusion
-
-Each pass outputs structured findings:
+Each sub-agent outputs structured findings:
 
 ```json
 {
-  "pass": "A",
   "findings": [
     {
       "id": "A-001",
+      "agent": "A",
       "location": "Goals & Non-Goals",
       "severity": "blocking",
       "angle": "wrong problem",
@@ -64,29 +52,41 @@ Each pass outputs structured findings:
 
 **Proof must be concrete**: cite the specific claim in the document and the scenario that breaks it. If you cannot construct concrete proof, set `severity` to `question`, never `blocking`.
 
+### Orchestrator: challenge to consensus
+
+The orchestrator runs on **Opus** and does not one-shot-accept what the sub-agents return. For each finding:
+1. **Challenge** — stress-test the claim: is the proof concrete? does the scenario actually break the document? does the severity hold?
+2. The sub-agent **re-engages** — re-reads the document / re-reasons, then defends with stronger proof or revises / withdraws.
+3. **Loop to consensus.** Soft cap of 5 rounds; if still unresolved, the orchestrator makes the final call (keep | drop) and records *why* it overruled. Never loop unbounded; never silently drop a contested finding.
+
+Once the findings reach consensus, the orchestrator:
+- **Deduplicates**: same location + same reason → keep highest severity, merge rationale
+- **Resolves conflicts**: Agent A's judgment takes priority for problem-level issues, Agent B's for direction-level
+- **Formats**: convert findings into the comment format below
+- **Concludes**: write a mandatory conclusion
+
 ### Execution Flow
 
 ```
-Design Doc + Guide  [loaded once into context — cached for passes B and C]
-       │
-       ▼
-   Pass A (wrong problem)        → findings JSON
-       │
-       ▼
-   Pass B (wrong direction)      → findings JSON   [reuses cached prefix]
-       │
-       ▼
-   Pass C (unrecognized reality) → findings JSON   [reuses cached prefix]
-       │
-       ▼
-   Synthesis → Final Review       (dedup, conflict resolution, format, conclude)
+Design Doc
+  ├─→ Agent A (wrong problem)         ─ Sonnet ┐
+  ├─→ Agent B (wrong direction)       ─ Sonnet ├─ parallel
+  └─→ Agent C (unrecognized reality)  ─ Sonnet ┘
+                  │ findings JSON
+                  ▼
+        Orchestrator ─ Opus
+          challenge ↔ sub-agent re-engages   (loop ≤ 5 → consensus,
+                                               else decide + record why)
+          dedup · resolve · format · conclude
+                  ▼
+            Final Review
 ```
 
 ---
 
 ## How to Question
 
-Two questioning paths apply across all passes:
+Two questioning paths apply across all sub-agents:
 
 **Path 1 — Direction challenge** (is this claim the right answer?)
 - Trace back to the Problem Statement — does this claim map to a real goal?
@@ -102,7 +102,7 @@ Two questioning paths apply across all passes:
 
 ---
 
-## Pass A: Wrong Problem
+## Agent A: Wrong Problem
 
 **Core question**: Does this plan solve the right problem for the right people?
 
@@ -118,7 +118,7 @@ Two questioning paths apply across all passes:
 
 ---
 
-## Pass B: Wrong Direction
+## Agent B: Wrong Direction
 
 **Core question**: Can this approach actually achieve the stated goals?
 
@@ -142,7 +142,7 @@ Two questioning paths apply across all passes:
 
 ---
 
-## Pass C: Unrecognized Reality
+## Agent C: Unrecognized Reality
 
 **Core question**: What hidden assumptions or constraints could invalidate this plan?
 
@@ -236,37 +236,36 @@ Two failure modes:
 
 ### Execution Architecture
 
-Detail Review is executed by **a single reviewer running Section 0 first, then Sections 1–8 as sequential passes in the same conversation context**, followed by a synthesis step.
-
-**Do not spawn sub-agents — they don't share the parent's cache, so parallel sub-agents would re-process this prefix 9 times. That's why passes run inline.**
+Detail Review is executed by **1 orchestrator + parallel section sub-agents**. Section 0 (Coverage Check) runs first and its coverage map is injected into every section sub-agent; Sections 1–8 then run as parallel sub-agents. Model assignment follows the **Subagent Execution** umbrella in `CLAUDE.md`.
 
 ```
-Overview Design + Detail Design + Guide  [loaded once into context — cached]
+Overview Design + Detail Design + Guide
        │
        ▼
-   Section 0 (Coverage Check)             → produces coverage map
-       │
+   Section 0 (Coverage Check) ─ produces coverage map
+       │   (map injected into every section sub-agent below)
        ▼
-   Section 1 (Module Responsibilities)    → findings JSON   [reuses cached prefix]
-       │
-       ▼
-   Section 2 (Data Model)                 → findings JSON   [reuses cached prefix]
-       │
-       ▼
-   …Sections 3–8 in turn…                 → findings JSON   [reuses cached prefix]
-       │
-       ▼
-   Synthesis → Final Review                (dedup, format, conclude)
+  ├─→ Section 1 (Module Responsibilities)  ─ Sonnet ┐
+  ├─→ Section 2 (Data Model)               ─ Sonnet ├─ parallel
+  └─→ …Sections 3–8…                       ─ Sonnet ┘
+                  │ findings JSON
+                  ▼
+        Orchestrator ─ Opus
+          challenge ↔ section re-engages   (loop ≤ 5 → consensus,
+                                             else decide + record why)
+          dedup · format · conclude
+                  ▼
+            Final Review
 ```
 
 ### Execution Protocol
 
-1. **Load once**: read the Overview Design, Detail Design, and this guide into context. Do not re-read between section passes.
-2. **Run Section 0**: build the coverage map (every Goal and Flow from Overview → which Detail section addresses it). Any unmapped item is recorded as a `[blocking]` finding immediately. The coverage map stays in context and is consulted by every later pass.
-3. **Run Sections 1–8 in order**: each section is a separate pass over the same loaded context, focused on that section's questions (below). Skip a section only when the Detail Design genuinely has no content for it — and ask why the absence is acceptable; if a feature requires that section, the absence itself is `[blocking]`.
-4. **Synthesize**: deduplicate same-location findings across passes, format into comments, write a mandatory conclusion.
+1. **Run Section 0 first**: build the coverage map (every Goal and Flow from Overview → which Detail section addresses it). Any unmapped item is a `[blocking]` finding immediately. Inject the coverage map into every section sub-agent's prompt.
+2. **Dispatch Sections 1–8 in parallel**: each section sub-agent receives the confirmed Overview Design, the Detail Design, this guide, the coverage map, and its section's questions (below). Skip a section only when the Detail Design genuinely has no content for it — and ask why the absence is acceptable; if a feature requires that section, the absence itself is `[blocking]`.
+3. **Challenge to consensus**: the Opus orchestrator stress-tests each finding; the section sub-agent re-engages and defends / revises / withdraws; loop with a soft cap of 5 rounds, then the orchestrator decides (keep | drop) and records why.
+4. **Synthesize**: deduplicate same-location findings across sections, format into comments, write a mandatory conclusion.
 
-Each pass outputs findings in the same JSON schema as Overview Review, with `pass` set to the section identifier (e.g., `"pass": "Section 3"`).
+Each sub-agent outputs findings in the same JSON schema as Overview Review, with `agent` set to the section identifier (e.g., `"agent": "Section 3"`).
 
 ---
 
@@ -274,7 +273,7 @@ Each pass outputs findings in the same JSON schema as Overview Review, with `pas
 
 Map every Goal and Flow from Overview to a section in Detail. Any unmapped item → `[blocking]`.
 
-Keep the coverage map in context — every later section pass consults it.
+Inject the coverage map into every section sub-agent's prompt — every section consults it.
 
 ---
 
