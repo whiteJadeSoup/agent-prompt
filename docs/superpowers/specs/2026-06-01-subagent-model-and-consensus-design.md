@@ -61,8 +61,8 @@ For each finding:
      (missing input, untested path, weak/none-executable proof).
   2. Worker re-engages — searches / re-reads / re-reasons, then either
      defends with stronger proof, or revises / withdraws the finding.
-  3. Loop. Soft cap 5 rounds. If consensus is reached earlier, stop.
-     If still unresolved after 5: the orchestrator makes the final call
+  3. Loop. Soft cap 3 rounds. If consensus is reached earlier, stop.
+     If still unresolved after 3: the orchestrator makes the final call
      (keep | drop) and records WHY it overruled. Never loop unbounded;
      never silently drop a contested finding.
 ```
@@ -81,7 +81,7 @@ PR diff + guide
    Orchestrator (OPUS):
      for each finding:  challenge ──▶ Agent re-engages (search / reason)
                             ◀── defend w/ stronger proof | revise | withdraw
-                        └─ loop ≤5 rounds → consensus, else orchestrator
+                        └─ loop ≤3 rounds → consensus, else orchestrator
                            decides (keep|drop) + records why ─┘
             ▼
    dedup · resolve conflicts · format · conclude · ANSWER
@@ -103,7 +103,7 @@ Overview Review                         Detail Review
   B wrong direction      ─ Sonnet ├par      │ → injected into all sections
   C unrecognized reality ─ Sonnet ┘         ▼
             ▼                              Sections 1–8 ─ Sonnet · parallel
-  Orchestrator (OPUS) — challenge ↔ consensus loop (≤5, else decide+record)
+  Orchestrator (OPUS) — challenge ↔ consensus loop (≤3, else decide+record)
 ```
 
 ---
@@ -124,7 +124,7 @@ The inline design optimized **input-token cost** (cache reuse). This design opti
 ### Risks
 
 - **Type A — cost of choosing.** Re-processing the diff/guide prefix per worker costs more input tokens than the cached inline design. Accepted in exchange for parallelism, model specialization, and the consensus loop. Mitigation: workers run on Sonnet (cheaper per token), Opus is reserved for the orchestrator.
-- **Type B — intrinsic fragility.** The consensus loop can fail to converge (worker keeps defending, orchestrator keeps doubting). Mitigation: **soft cap of 5 rounds, then the orchestrator decides and records why** — a hard termination guarantee with no silent drops. Second fragility: the model table can misclassify a nuanced task; mitigation is the default rule, which errs to Opus for anything correctness-critical and reserves Haiku for clearly-mechanical work.
+- **Type B — intrinsic fragility.** The consensus loop can fail to converge (worker keeps defending, orchestrator keeps doubting). Mitigation: **soft cap of 3 rounds, then the orchestrator decides and records why** — a hard termination guarantee with no silent drops. Second fragility: the model table can misclassify a nuanced task; mitigation is the default rule, which errs to Opus for anything correctness-critical and reserves Haiku for clearly-mechanical work.
 
 ---
 

@@ -50,7 +50,7 @@ When you fan work out to parallel sub-agents, the orchestrator (run it on Opus) 
 
 1. **Challenge** it — ask a follow-up that stress-tests the claim (missing input, untested path, weak or non-executable proof).
 2. The sub-agent **re-engages** — searches / re-reads / re-reasons, then defends with stronger proof or revises / withdraws.
-3. **Loop to consensus.** Soft cap of 5 rounds; if still unresolved, the orchestrator makes the final call (keep | drop) and records *why* it overruled. Never loop unbounded; never silently drop a contested finding.
+3. **Loop to consensus.** Soft cap of 3 rounds; if still unresolved, the orchestrator makes the final call (keep | drop) and records *why* it overruled. Never loop unbounded; never silently drop a contested finding.
 
 ## Design
 @instructions/design-thinking.md — thinking discipline for all design decisions (constraints, tradeoffs, reversibility, failure analysis)

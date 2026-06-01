@@ -57,7 +57,7 @@ Each sub-agent outputs structured findings:
 The orchestrator runs on **Opus** and does not one-shot-accept what the sub-agents return. For each finding:
 1. **Challenge** — stress-test the claim: is the proof concrete? does the scenario actually break the document? does the severity hold?
 2. The sub-agent **re-engages** — re-reads the document / re-reasons, then defends with stronger proof or revises / withdraws.
-3. **Loop to consensus.** Soft cap of 5 rounds; if still unresolved, the orchestrator makes the final call (keep | drop) and records *why* it overruled. Never loop unbounded; never silently drop a contested finding.
+3. **Loop to consensus.** Soft cap of 3 rounds; if still unresolved, the orchestrator makes the final call (keep | drop) and records *why* it overruled. Never loop unbounded; never silently drop a contested finding.
 
 Once the findings reach consensus, the orchestrator:
 - **Deduplicates**: same location + same reason → keep highest severity, merge rationale
@@ -75,7 +75,7 @@ Design Doc
                   │ findings JSON
                   ▼
         Orchestrator ─ Opus
-          challenge ↔ sub-agent re-engages   (loop ≤ 5 → consensus,
+          challenge ↔ sub-agent re-engages   (loop ≤ 3 → consensus,
                                                else decide + record why)
           dedup · resolve · format · conclude
                   ▼
@@ -251,7 +251,7 @@ Overview Design + Detail Design + Guide
                   │ findings JSON
                   ▼
         Orchestrator ─ Opus
-          challenge ↔ section re-engages   (loop ≤ 5 → consensus,
+          challenge ↔ section re-engages   (loop ≤ 3 → consensus,
                                              else decide + record why)
           dedup · format · conclude
                   ▼
@@ -262,7 +262,7 @@ Overview Design + Detail Design + Guide
 
 1. **Run Section 0 first**: build the coverage map (every Goal and Flow from Overview → which Detail section addresses it). Any unmapped item is a `[blocking]` finding immediately. Inject the coverage map into every section sub-agent's prompt.
 2. **Dispatch Sections 1–8 in parallel**: each section sub-agent receives the confirmed Overview Design, the Detail Design, this guide, the coverage map, and its section's questions (below). Skip a section only when the Detail Design genuinely has no content for it — and ask why the absence is acceptable; if a feature requires that section, the absence itself is `[blocking]`.
-3. **Challenge to consensus**: the Opus orchestrator stress-tests each finding; the section sub-agent re-engages and defends / revises / withdraws; loop with a soft cap of 5 rounds, then the orchestrator decides (keep | drop) and records why.
+3. **Challenge to consensus**: the Opus orchestrator stress-tests each finding; the section sub-agent re-engages and defends / revises / withdraws; loop with a soft cap of 3 rounds, then the orchestrator decides (keep | drop) and records why.
 4. **Synthesize**: deduplicate same-location findings across sections, format into comments, write a mandatory conclusion.
 
 Each sub-agent outputs findings in the same JSON schema as Overview Review, with `agent` set to the section identifier (e.g., `"agent": "Section 3"`).

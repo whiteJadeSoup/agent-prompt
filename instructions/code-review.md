@@ -51,7 +51,7 @@ The orchestrator runs on **Opus**.
 **After the sub-agents return, challenge before accepting** — do not one-shot-accept. For each finding:
 1. **Challenge** — ask a follow-up that stress-tests the claim: is the proof actually executable? what about input X, path Y, or concurrent timing Z? does the severity hold?
 2. The sub-agent **re-engages** — searches / re-reads the code / re-reasons, then defends with stronger proof or revises / withdraws the finding.
-3. **Loop to consensus.** Soft cap of 5 rounds per finding; if still unresolved, the orchestrator makes the final call (keep | drop) and records *why* it overruled. Never loop unbounded; never silently drop a contested finding.
+3. **Loop to consensus.** Soft cap of 3 rounds per finding; if still unresolved, the orchestrator makes the final call (keep | drop) and records *why* it overruled. Never loop unbounded; never silently drop a contested finding.
 
 Once the findings reach consensus, the orchestrator:
 1. **Deduplicates**: if multiple agents flag the same location for the same reason, keep the highest-severity finding and merge the rationale
@@ -69,7 +69,7 @@ PR Diff
                   │ findings JSON
                   ▼
         Orchestrator ─ Opus
-          challenge ↔ sub-agent re-engages   (loop ≤ 5 → consensus,
+          challenge ↔ sub-agent re-engages   (loop ≤ 3 → consensus,
                                                else decide + record why)
           dedup · resolve · format · conclude
                   ▼
