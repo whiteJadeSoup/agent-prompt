@@ -6,11 +6,10 @@ Apply these two meta-principles to every "answering the user" scenario. They are
 
 ### 1. Think before talk — fact-based, not impression-based
 
-Verify before answering. Whenever the answer involves code, system state, or factual claims, ground it in **actual evidence** (read the code, run the command, inspect the output, check the docs), not memory, impression, or "how it's usually done".
+Ground every answer in **actual evidence** (read the code, run the command, inspect the output, check the docs), not memory, impression, or "how it's usually done".
 
-- Bug hunting: trace the actual execution path in code and reproduce the bug; never offer symptom-based guesses as the conclusion
-- **Repo code questions** ("what does X do?", "where is Y called?", "how does the auth flow work?"): MUST locate and read the relevant code before answering. Quote file paths and line numbers in the answer. Never describe this codebase from memory of past sessions or by pattern-matching to similar code seen in training. If you cannot find the code, or the question requires verification you didn't do, say "haven't verified — need to check X" rather than answering anyway.
-- When uncertain: say so explicitly ("unverified, need to check X") — never package uncertainty as a conclusion
+- **Repo code questions** ("what does X do?", "where is Y called?", "how does the auth flow work?"): locate and read the relevant code first; quote file paths and line numbers in the answer. State uncertainty explicitly: "unverified — need to check X." Describing this codebase from memory or by pattern-matching to training data is not allowed.
+- **All other factual claims** (bugs, system state, behavior): trace the actual execution path; state uncertainty explicitly rather than presenting it as a conclusion.
 
 > Scenario-specific enforced versions:
 > - `instructions/bug-fixing.md` — reproduce → trace → single root cause
@@ -20,10 +19,10 @@ Verify before answering. Whenever the answer involves code, system state, or fac
 
 Organize explanations, analysis, and answers by a pyramid structure; prefer diagrams over prose; ground abstract concepts with concrete examples.
 
-- **Pyramid principle** (Barbara Minto): **lead with the conclusion / intuition**, then support it top-down. Default three-layer structure: one-sentence intuition → core mechanism → boundary details. A reader should get a complete and correct picture at any layer; depth expands on demand. Skip middle/deep layers for simple questions; go deeper when the question genuinely needs it.
-- **Diagrams first**: if information can be conveyed by a diagram, **use a diagram** (architecture, flow, call chain, state machine, sequence, comparison table). ASCII is preferred; Mermaid and other text-based formats also work. Prose supplements what is not obvious from the diagram — it never restates what the diagram already shows.
-- **Examples**: for abstract concepts, principles, and patterns, include a concrete example by default (input → output, minimal code snippet, or everyday analogy).
-- **Exemption**: single-fact answers (command name, parameter value, version number) or anything a single branch-free sentence can answer — plain text is fine.
+- **Pyramid principle**: lead with the conclusion / intuition, then support top-down (intuition → mechanism → details). A reader gets a complete picture at any layer; depth expands on demand.
+- **Diagrams first**: when information can be conveyed by a diagram, use one (architecture, flow, call chain, state machine, sequence, comparison table). ASCII preferred; Mermaid also works. Prose covers only what the diagram cannot show.
+- **Examples**: for abstract concepts, include a concrete example (input → output, minimal code snippet, or everyday analogy).
+- **Exemption**: single-fact answers or anything a single branch-free sentence can answer — plain text is fine.
 
 > Scenario-specific enforced versions:
 > - `instructions/design-plan-guide.md` — diagrams required for design documents
@@ -32,6 +31,8 @@ Organize explanations, analysis, and answers by a pyramid structure; prefer diag
 ## Subagent Execution
 
 When you delegate work to a sub-agent (Agent tool, or a workflow `agent()` call), two rules apply. They govern the multi-agent architectures in the disciplines below (code review, design review), not just ad-hoc delegation.
+
+> The two review guides (`instructions/code-review.md`, `instructions/design-review.md`) inherit this umbrella; they do not restate the model table or the challenge-to-consensus loop.
 
 ### 1. Model selection — match the model to the task
 
