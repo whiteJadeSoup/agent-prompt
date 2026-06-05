@@ -14,7 +14,7 @@ Code review is executed by **3 parallel sub-agents + 1 orchestrator**. The sub-a
 | **Agent B: Quality & Resilience** | Error handling, performance (hot path, IO patterns, scale cliffs, resource limits), observability, impact on other paths, architecture compliance, maintainability | Sonnet | `[blocking]` or `[question]` |
 | **Agent C: Clarity & Coverage** | Readability, abstraction consistency, test coverage, dead code/redundancy | Sonnet | `[question]`, `[suggestion]`, `[nit]` |
 
-Security is an angle inside Agent A and runs on Sonnet like the rest of the review — the Opus orchestrator's challenge loop (below) is its safety net. The umbrella's `standalone security analysis → Opus` is for a dedicated security audit, not the security angle embedded here.
+Security is an angle inside Agent A (Sonnet); the orchestrator's challenge loop is its safety net. `standalone security analysis → Opus` applies only to a dedicated audit, not this embedded angle.
 
 ### Sub-agent Output Format
 
@@ -46,11 +46,11 @@ Each sub-agent must output a structured findings list. Free-text comments are no
 
 The orchestrator runs on **Opus**.
 
-**Before dispatching sub-agents**, inject the full review context into each sub-agent's prompt — they do not have this guide automatically, they only know what the orchestrator tells them. Each prompt must include:
-- The PR identifier (number or branch) — sub-agents read the code themselves
-- The agent's assigned focus area (from the table above)
-- The **complete contents of this code review guide** (Parts 1–4), so the sub-agent applies the same skeptical mindset, diagram requirements, comment format, label definitions, and angles table
-- The **output format** (JSON findings schema above)
+**Before dispatching sub-agents**, each prompt must include:
+- PR identifier (number or branch) — sub-agents read the code themselves
+- Agent's assigned focus area (from the table above)
+- **Complete contents of this guide** (Parts 1–4) — skeptical mindset, diagram rules, comment format, labels, angles table
+- **Output format** (JSON findings schema above)
 
 > Orchestration follows the challenge-to-consensus loop in CLAUDE.md › Subagent Execution.
 
@@ -121,12 +121,8 @@ Go through the diff yourself:
 <example>
 > `ModelService.java:142` was missing `modelId` in the `modelBasicInfo` object it constructs. This causes the duplicate name check to always treat the current model as a stranger:
 > ```
-> PUT /model/123 (update bindings only)
->   └─ ModelService.buildBasicInfo()     [ModelService.java:138]
->        └─ modelBasicInfo.modelId = null   ← missing assignment
->             └─ DuplicateNameChecker.check(modelBasicInfo)
->                  └─ !Objects.equals(null, m.getId())  → always true
->                       └─ throws DuplicateNameException  ← wrong
+> ModelService.buildBasicInfo() → modelBasicInfo.modelId = null  ← missing assignment
+>   → DuplicateNameChecker: !Objects.equals(null, m.getId()) always true → throws DuplicateNameException  ← wrong
 > ```
 > Confirmed by adding a log at `ModelService.java:142` to print `modelBasicInfo.getModelId()` — it printed `null` on every update request, regardless of the actual model ID.
 </example>
@@ -200,39 +196,27 @@ Work through the following questioning patterns before forming any judgment:
 - The PR says X causes Y. Is there another path that also causes Y, which this fix doesn't touch?
 - The fix is applied at layer A. Could the same bug re-enter from layer B?
 
-*Example: A fix that adds a null-check in the service layer — but the controller can also call the downstream directly, bypassing the check entirely.*
-
 **What if the inputs are different?**
 - What if this field is null / empty / negative / max-int / a very long string?
 - What if the caller sends two concurrent requests for the same resource?
 - What if this runs during a partial failure — e.g., the DB write succeeds but the cache invalidation fails?
-
-*Example: A "create if not exists" implementation that works correctly in isolation but creates duplicates under concurrent load.*
 
 **What if the environment changes?**
 - What if the dependent service is slow or unavailable?
 - What if this is called at 10x the expected volume?
 - What if this code executes in a different order than the author assumed (e.g., retries, async callbacks)?
 
-*Example: A retry loop that is safe when idempotent, but causes double-charges when the underlying operation is not.*
-
 **What scale/load assumption is this code making?**
 
 Apply the four Performance angles from the 🟡 angles table below (hot path & complexity, IO patterns, scale cliff, resource limits).
-
-*Example: A `getOrdersByUser()` that loads all orders into memory and filters in-app — works at 200/user, breaks at 10k/user with no warning.*
 
 **Does the fix hold at the boundary?**
 - The fix works for the described scenario. Does it also work for the adjacent scenario the PR doesn't mention?
 - Is there an off-by-one, a timezone edge, an encoding edge, a locale-specific behavior?
 
-*Example: A date comparison that works correctly in UTC but silently breaks for users in UTC+14.*
-
 **Are the claims in the PR description actually verified?**
 - The PR says "confirmed by logging X" — is that log sufficient proof, or could it be misleading?
 - The PR says "this doesn't affect path Z" — did the author verify that, or just assert it?
-
-*Example: A PR claims the create path is unaffected, but the reviewer finds both create and update share the same helper function that was modified.*
 
 **Output rule**: Every question you raise must be resolved before moving to Step 3.
 - If reading the code answers it → answer it and move on
@@ -299,31 +283,31 @@ Every comment must be structured as follows:
 
 | Angle | What to look for |
 |-------|-----------------|
-| **Correctness** | Logic errors, missing boundary conditions, null handling, incomplete branches |
-| **Security** | Unvalidated user input, sensitive data leaked to logs or stdout |
-| **Concurrency safety** | Race conditions, duplicate submission risk, incorrect async ordering |
-| **Idempotency** | Is it safe to retry write operations? Can repeated execution cause side effects? |
-| **Backward compatibility** | Do interface/parameter/output format changes break existing callers? |
-| **Exception path integrity** | Is system state consistent after an exception? Any half-written data? |
-| **Resource management** | Are files/connections properly released? Any memory leaks? |
-| **Impact on other paths** | Does the change accidentally affect other functionality? Read beyond the diff. |
-| **Architecture compliance** | Violates layering rules, module boundaries, or naming conventions |
-| **Maintainability** | This change introduces tight coupling or low cohesion; a function/module takes on too many responsibilities |
+| **Correctness** | Logic errors; missing boundary conditions; null handling; incomplete branches |
+| **Security** | Unvalidated user input; sensitive data in logs or stdout |
+| **Concurrency safety** | Race conditions; duplicate submission; incorrect async ordering |
+| **Idempotency** | Retry-safe writes? Repeated execution causes side effects? |
+| **Backward compatibility** | Interface/parameter/output changes break existing callers? |
+| **Exception path integrity** | Consistent state after exception? Half-written data? |
+| **Resource management** | Files/connections released? Memory leaks? |
+| **Impact on other paths** | Change accidentally affects other functionality? Read beyond the diff. |
+| **Architecture compliance** | Violates layering, module boundaries, or naming conventions |
+| **Maintainability** | Tight coupling; low cohesion; module takes on too many responsibilities |
 
 🟡 **Should flag** → `[question]` or `[blocking]`
 
 | Angle | What to look for |
 |-------|-----------------|
-| **Readability** | Inaccurate names, missing comments on complex logic, functions doing more than one thing |
-| **Abstraction consistency** | High-level business logic and low-level implementation details mixed in the same function |
-| **Error handling** | External calls fail without proper handling; error messages are unclear |
-| **Performance — hot path & complexity** | Algorithmic complexity worse than needed on frequently-called paths (O(n²) where O(n) suffices, unnecessary nesting, repeated work in tight loops) |
-| **Performance — IO patterns** | N+1 queries, sync IO inside a loop, missing batching, missing cache where one obviously fits |
-| **Performance — scale cliff** | Code that works at current data size but degrades sharply at 10x — unbounded sorts, full-table scans, in-memory accumulation that grows with input |
-| **Performance — resource limits** | Connection pool / file descriptors / thread pool / memory exhaustion under load; missing back-pressure on unbounded queues |
-| **Observability** | Missing logs for key operations, incorrect log levels |
-| **Test coverage** | Core logic untested; bug fixes missing regression tests |
-| **Dead code / redundancy** | Unreachable code, duplicated logic, unused variables |
+| **Readability** | Inaccurate names; missing comments on complex logic; function does too many things |
+| **Abstraction consistency** | Business logic mixed with low-level detail in same function |
+| **Error handling** | External calls unhandled; error messages unclear |
+| **Performance — hot path & complexity** | O(n²) where O(n) suffices; unnecessary nesting; repeated work in hot loops |
+| **Performance — IO patterns** | N+1 queries; sync IO in loop; missing batching or cache |
+| **Performance — scale cliff** | Degrades sharply at 10x — unbounded sorts, full-table scans, in-memory accumulation |
+| **Performance — resource limits** | Pool / fd / thread / memory exhaustion under load; missing back-pressure |
+| **Observability** | Missing logs for key operations; wrong log levels |
+| **Test coverage** | Core logic untested; bug fix missing regression test |
+| **Dead code / redundancy** | Unreachable code; duplicated logic; unused variables |
 
 <avoid>
 - **Code formatting** — leave to the linter; never appear in review comments
