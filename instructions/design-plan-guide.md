@@ -37,13 +37,13 @@ The document has two parts: **Overview** (why + what) confirmed first, then **De
 **Diagrams are required, and they come before prose.** Prose explains only what diagrams cannot — participant roles, dependency types, error-path triggers. Restating the diagram in words is grounds for review rejection.
 - **Architecture Diagram** — a single C4 diagram combining Context (L1) and Container (L2) in one view: external actors and external systems outside the boundary, internal containers inside, stay above class/function level. The diagram must answer three questions: (1) what responsibility blocks exist, (2) **what data flows where, and why**, (3) where the key design decision lands. Rules:
   - Unit of analysis is a **responsibility module or service** — never a file or function
-  - **Each box must list "core design" — 3–6 what-level bullets** (responsibilities, key constraints, traceability IDs back to Goals / Risks). Write what-level details; how-level details (algorithms, thresholds, field formats, function signatures) belong in Detail Design.
+  - **Each box must list "core design" — 3–6 what-level bullets** (responsibilities, key constraints, traceability IDs back to Goals / Risks). No how-level details (algorithms, thresholds, field formats, function signatures) — those belong in Detail Design.
 
     <example>`行号化输出` · `read-gate (G3)` · `staleness 检查 (B2)`</example>
     <counterexample>`cat -n 输出 (lineno + tab + content)` · `> 256KB 拒` · `stored mtime != FS mtime → 拒`</counterexample>
 
-  - **Arrows carry data flow with both payload and purpose**: each label takes the form `<what data> / <purpose>` (e.g., `path / read-gate check`, `user profile / authz check`). A reader looking at any single arrow alone must know what crosses it and why.
-  - **Numbered execution sequence (⓪①②③) is optional**: use it when the design has a natural temporal flow that helps the reader follow the main path; skip for purely static structures or multi-entry systems where one sequence cannot represent all paths
+  - **Arrows carry data flow with both payload and purpose**: each label takes the form `<what data> / <purpose>` (e.g., `path / read-gate check`, `user profile / authz check`).
+  - **Numbered execution sequence (⓪①②③) is optional**: use for natural temporal flows; skip for purely static structures or multi-entry systems
   - Annotate the critical design decision directly on the diagram (e.g., "dispatch table — replaces if-elif chain")
   - Mark added / modified / removed via color or annotation
   - Split into separate Context + Container diagrams when box count exceeds ~15, or when external ecosystem is itself the core complexity
@@ -53,7 +53,7 @@ The document has two parts: **Overview** (why + what) confirmed first, then **De
     <counterexample>Boxes labeled only with names; arrows labeled only with verbs or call sites</counterexample>
     <example>Responsibility boxes with what-level core design bullets, arrows labeled `data / purpose`, and a callout on the key decision</example>
 
-- **Flow Diagrams** — one core flow (main path) and 1–2 edge flows (critical error / boundary paths). Participants are modules / services / roles. Keep function names out of flow diagrams — those belong in Detail. Flows must show execution order (numbered steps or directed arrows), not just static dependencies.
+- **Flow Diagrams** — one core flow (main path) and 1–2 edge flows (critical error / boundary paths). Participants are modules / services / roles — no function names (those belong in Detail). Flows must show execution order, not just static dependencies.
 
 **3. Research & Comparison** — **web search is mandatory before writing this section.** Decisions must be grounded in industry practice, not local reasoning.
 - Alternatives considered (industry practice, leading implementations)
@@ -116,7 +116,6 @@ invariant: at most one running lease per task
 ```
 call           failure          handling          caller sees
 storage.write  transient IO     retry x3 jitter   ok | PersistError
-payment.api    timeout          fail-fast         PaymentTimeout
 ```
 </format>
 
@@ -135,7 +134,7 @@ TaskController.start(req)
 ```
 </example>
 
-**6. Performance Estimation** — required when Goals are quantitative. Estimate throughput / latency on the critical path. State input assumptions (QPS, payload size) and the bottleneck. Stop once the estimate clears the Goal.
+**6. Performance Estimation** — required when Goals are quantitative. Estimate throughput / latency on the critical path; state input assumptions (QPS, payload size) and the bottleneck.
 
 <format>
 ```
@@ -158,7 +157,7 @@ Each test case specifies:
 - **Expected** — observable output / state / side effect (not "should work")
 - **Level** — unit / integration / e2e (pick one)
 
-**Mock boundaries with rationale** — list what is mocked and what is not, and why each boundary was drawn there (e.g., "DB not mocked: schema constraints are a key test point. External payment service mocked: covered by contract tests.").
+**Mock boundaries with rationale** — list what is mocked and what is not, and why (e.g., "DB not mocked: schema constraints are a key test point. Payment service mocked: covered by contract tests.").
 
 **Pass criteria** trace back to the Goal. Quantitative Goal → comparable numeric output. Behavioral Goal → assertion on observable state.
 
@@ -177,7 +176,7 @@ Pass:  all four pass; T2 repeated 100× with zero flakes.
 ```
 </format>
 
-**8. Migration & Compatibility** — required when modifying existing systems. Cover migration steps in order, canary / rollback plan, compatibility while old and new coexist.
+**8. Migration & Compatibility** — required when modifying existing systems. Cover migration steps in order, canary / rollback plan.
 
 <format>
 ```
