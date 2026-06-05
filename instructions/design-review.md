@@ -28,36 +28,17 @@ Overview Review is executed by **3 parallel sub-agents + 1 orchestrator**. Each 
 | **Agent B: Direction** | Wrong direction | Sonnet | Can this approach actually achieve the stated goals? |
 | **Agent C: Reality** | Unrecognized reality | Sonnet | What hidden assumptions or constraints could invalidate this plan? |
 
-**Before dispatching sub-agents**, the orchestrator injects into each prompt: the design document identifier (sub-agents read the document themselves), the agent's assigned focus area and core question, the complete contents of this review guide, and the JSON output schema below.
+**Before dispatching sub-agents**, the orchestrator injects into each prompt: the design document identifier (sub-agents read the document themselves), the agent's assigned focus area and core question, the complete contents of this review guide, and the findings schema.
 
-Each sub-agent outputs structured findings:
+> Findings use the JSON schema in **code-review.md › Sub-agent Output Format**, with `agent` set to the regret-source (A/B/C), `angle` to the regret type (e.g. "wrong problem"), and `location` to the document section.
 
-```json
-{
-  "findings": [
-    {
-      "id": "A-001",
-      "agent": "A",
-      "location": "Goals & Non-Goals",
-      "severity": "blocking",
-      "angle": "wrong problem",
-      "what": "...",
-      "why": "...",
-      "proof": "...",
-      "suggestion": "..."
-    }
-  ]
-}
-```
+**Proof must be concrete**: cite the specific claim in the document and the scenario that breaks it. Set `severity` to `question` whenever you cannot construct concrete proof — never set it to `blocking` without proof.
 
-**Proof must be concrete**: cite the specific claim in the document and the scenario that breaks it. If you cannot construct concrete proof, set `severity` to `question`, never `blocking`.
+### Orchestrator
 
-### Orchestrator: challenge to consensus
+The orchestrator runs on **Opus**.
 
-The orchestrator runs on **Opus** and does not one-shot-accept what the sub-agents return. For each finding:
-1. **Challenge** — stress-test the claim: is the proof concrete? does the scenario actually break the document? does the severity hold?
-2. The sub-agent **re-engages** — re-reads the document / re-reasons, then defends with stronger proof or revises / withdraws.
-3. **Loop to consensus.** Soft cap of 3 rounds; if still unresolved, the orchestrator makes the final call (keep | drop) and records *why* it overruled. Never loop unbounded; never silently drop a contested finding.
+> Orchestration follows the challenge-to-consensus loop in **CLAUDE.md › Subagent Execution**.
 
 Once the findings reach consensus, the orchestrator:
 - **Deduplicates**: same location + same reason → keep highest severity, merge rationale
@@ -75,8 +56,7 @@ Design Doc
                   │ findings JSON
                   ▼
         Orchestrator ─ Opus
-          challenge ↔ sub-agent re-engages   (loop ≤ 3 → consensus,
-                                               else decide + record why)
+          challenge ↔ re-engage (≤3)
           dedup · resolve · format · conclude
                   ▼
             Final Review
@@ -96,9 +76,13 @@ Two questioning paths apply across all sub-agents:
 - Identify the claim's hidden premises (dependency SLAs, data volume, call ordering, consistency guarantees, team capability)
 - Construct a concrete scenario where the premise fails and describe the impact
 
-*Example of premise challenge: "The design assumes the downstream service responds within 100ms. What happens under load when it takes 2s — does the architecture degrade gracefully or cascade-fail?"*
+<example>
+Premise challenge: "The design assumes the downstream service responds within 100ms. What happens under load when it takes 2s — does the architecture degrade gracefully or cascade-fail?"
+</example>
 
-*Example of direction challenge: "The design uses an async queue to decouple producer and consumer. But the Goal requires strong consistency — does async delivery actually satisfy that requirement?"*
+<example>
+Direction challenge: "The design uses an async queue to decouple producer and consumer. But the Goal requires strong consistency — does async delivery actually satisfy that requirement?"
+</example>
 
 ---
 
@@ -199,21 +183,21 @@ Two questioning paths apply across all sub-agents:
 | **Request Changes** | Blocking issues present; re-review required after fixes |
 | **Comment** | Open questions pending; conclusion deferred |
 
-Every review must end with an explicit conclusion. **The author must not begin Detail Design until the Overview is confirmed.**
+<gate>
+Every review must end with an explicit conclusion. The author must not begin Detail Design until the Overview is confirmed.
+</gate>
 
 ---
 
 ## Author's Responsibility After Receiving Comments
 
-Same rules as Code Review Part 3 of `code-review.md` — `[blocking]` / `[question]` / `[suggestion]` / `[nit]` response rules and thread-resolution rules apply unchanged to design comments.
+Same rules as **code-review.md › Part 3: Author's Responsibility After Receiving Comments** — the `[blocking]` / `[question]` / `[suggestion]` / `[nit]` response rules and thread-resolution rules apply unchanged to design comments.
 
 ---
 
 ## Re-review Responsibilities
 
-- **Primary goal**: verify that all previous `[blocking]` and `[question]` findings are correctly addressed
-- **New findings are allowed**: label them `[new finding]` — open a fresh comment, do not re-open original threads
-- Re-review ends with an updated conclusion (Confirm or Request Changes)
+Same as **code-review.md › Part 3.5: Re-review Responsibilities** — verify each prior `[blocking]`/`[question]` is addressed; label any new problem `[new finding]` in a fresh comment. Re-review ends with an updated conclusion (Confirm or Request Changes).
 
 ---
 
@@ -251,21 +235,22 @@ Overview Design + Detail Design + Guide
                   │ findings JSON
                   ▼
         Orchestrator ─ Opus
-          challenge ↔ section re-engages   (loop ≤ 3 → consensus,
-                                             else decide + record why)
+          challenge ↔ re-engage (≤3)
           dedup · format · conclude
                   ▼
             Final Review
 ```
 
+> Orchestration follows the challenge-to-consensus loop in **CLAUDE.md › Subagent Execution**.
+
 ### Execution Protocol
 
 1. **Run Section 0 first**: build the coverage map (every Goal and Flow from Overview → which Detail section addresses it). Any unmapped item is a `[blocking]` finding immediately. Inject the coverage map into every section sub-agent's prompt.
 2. **Dispatch Sections 1–8 in parallel**: each section sub-agent receives the confirmed Overview Design, the Detail Design, this guide, the coverage map, and its section's questions (below). Skip a section only when the Detail Design genuinely has no content for it — and ask why the absence is acceptable; if a feature requires that section, the absence itself is `[blocking]`.
-3. **Challenge to consensus**: the Opus orchestrator stress-tests each finding; the section sub-agent re-engages and defends / revises / withdraws; loop with a soft cap of 3 rounds, then the orchestrator decides (keep | drop) and records why.
+3. **Challenge to consensus**: follow the loop in **CLAUDE.md › Subagent Execution** — stress-test each finding; the section sub-agent re-engages and defends / revises / withdraws; then synthesize.
 4. **Synthesize**: deduplicate same-location findings across sections, format into comments, write a mandatory conclusion.
 
-Each sub-agent outputs findings in the same JSON schema as Overview Review, with `agent` set to the section identifier (e.g., `"agent": "Section 3"`).
+> Findings use the JSON schema in **code-review.md › Sub-agent Output Format**, with `agent` set to the section identifier (e.g. `"agent": "Section 3"`), `angle` to the detail concern, and `location` to the document section.
 
 ---
 
@@ -364,4 +349,6 @@ Forward compatibility is the default.
 | **Request Changes** | Blocking issues present; re-review required |
 | **Comment** | Open questions pending; conclusion deferred |
 
+<gate>
 Every Detail Review must end with an explicit conclusion.
+</gate>
