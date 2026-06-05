@@ -2,12 +2,15 @@
 
 ## Safety Rules
 
-- `git push` 前必须告知用户并等待确认，不可直接执行
-- `gh pr create` 前必须告知用户并等待确认，不可直接执行
+<gate>
+- 执行 `git push` 前先告知用户并等待确认，不可直接执行
+- 执行 `gh pr create` 前先告知用户并等待确认，不可直接执行
 - `git push --force` / `git push -f`：**默认拒绝**，除非用户明确说"我知道风险，强制推送"
-- **Merge conflicts**: when a conflict is detected, analyze the resolution first:
-  - If the resolution **combines both sides** (additive merge, no functionality lost) → resolve and proceed, briefly note what was merged
-  - If the resolution **discards or overwrites functionality from either branch** → present the conflict and proposed resolution, then **wait for user confirmation before proceeding**. Never silently drop changes from either side.
+</gate>
+
+**Merge conflicts**: when a conflict is detected, analyze the resolution first:
+- Resolution **combines both sides** (additive merge, no functionality lost) → resolve and proceed, briefly note what was merged
+- Resolution **discards or overwrites functionality from either branch** → present the conflict and proposed resolution, then **wait for user confirmation before proceeding**. Never silently drop changes from either side.
 
 ## Commit Convention
 
@@ -15,6 +18,7 @@ Follow [Conventional Commits v1.0.0-beta.4](https://www.conventionalcommits.org/
 
 ### Format
 
+<format>
 ```
 <type>[optional scope]: <description>
 
@@ -22,6 +26,7 @@ Follow [Conventional Commits v1.0.0-beta.4](https://www.conventionalcommits.org/
 
 [optional footer]
 ```
+</format>
 
 ### Types
 
@@ -44,6 +49,7 @@ Follow [Conventional Commits v1.0.0-beta.4](https://www.conventionalcommits.org/
 
 ### Examples
 
+<example>
 ```
 feat: add context engineering with /compact command
 
@@ -55,3 +61,4 @@ feat!: drop support for Python 3.10
 
 chore: update dependencies
 ```
+</example>
