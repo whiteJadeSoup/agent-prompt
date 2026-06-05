@@ -1,5 +1,7 @@
 # Code Review Guide
 
+> **Diagram (used throughout)** — any text-based format; ASCII preferred, Mermaid OK. Pick the shape that fits: architecture / sequence / flow / call chain / state.
+
 ## Part 0: Review Architecture (Multi-Agent Execution)
 
 Code review is executed by **3 parallel sub-agents + 1 orchestrator**. The sub-agents run concurrently, each focused on one concern; the orchestrator interrogates their findings and synthesizes the review. Model assignment follows the **Subagent Execution** umbrella in `CLAUDE.md`.
@@ -12,12 +14,13 @@ Code review is executed by **3 parallel sub-agents + 1 orchestrator**. The sub-a
 | **Agent B: Quality & Resilience** | Error handling, performance (hot path, IO patterns, scale cliffs, resource limits), observability, impact on other paths, architecture compliance, maintainability | Sonnet | `[blocking]` or `[question]` |
 | **Agent C: Clarity & Coverage** | Readability, abstraction consistency, test coverage, dead code/redundancy | Sonnet | `[question]`, `[suggestion]`, `[nit]` |
 
-Security is an angle inside Agent A and runs on Sonnet like the rest of the review — the Opus orchestrator's challenge loop (below) is its safety net. The umbrella's `standalone security analysis → Opus` is for a dedicated security audit, not the security angle embedded here.
+Security is an angle inside Agent A (Sonnet); the orchestrator's challenge loop is its safety net. `standalone security analysis → Opus` applies only to a dedicated audit, not this embedded angle.
 
 ### Sub-agent Output Format
 
 Each sub-agent must output a structured findings list. Free-text comments are not allowed at this stage.
 
+<format>
 ```json
 {
   "findings": [
@@ -35,6 +38,7 @@ Each sub-agent must output a structured findings list. Free-text comments are no
   ]
 }
 ```
+</format>
 
 **Proof must be executable**: specify exact inputs, call sequence, or concurrent timing. If you cannot construct a concrete proof, set `severity` to `question`, never `blocking`.
 
@@ -42,16 +46,13 @@ Each sub-agent must output a structured findings list. Free-text comments are no
 
 The orchestrator runs on **Opus**.
 
-**Before dispatching sub-agents**, inject the full review context into each sub-agent's prompt — they do not have this guide automatically, they only know what the orchestrator tells them. Each prompt must include:
-- The PR identifier (number or branch) — sub-agents read the code themselves
-- The agent's assigned focus area (from the table above)
-- The **complete contents of this code review guide** (Parts 1–4), so the sub-agent applies the same skeptical mindset, diagram requirements, comment format, label definitions, and angles table
-- The **output format** (JSON findings schema above)
+**Before dispatching sub-agents**, each prompt must include:
+- PR identifier (number or branch) — sub-agents read the code themselves
+- Agent's assigned focus area (from the table above)
+- **Complete contents of this guide** (Parts 1–4) — skeptical mindset, diagram rules, comment format, labels, angles table
+- **Output format** (JSON findings schema above)
 
-**After the sub-agents return, challenge before accepting** — do not one-shot-accept. For each finding:
-1. **Challenge** — ask a follow-up that stress-tests the claim: is the proof actually executable? what about input X, path Y, or concurrent timing Z? does the severity hold?
-2. The sub-agent **re-engages** — searches / re-reads the code / re-reasons, then defends with stronger proof or revises / withdraws the finding.
-3. **Loop to consensus.** Soft cap of 3 rounds per finding; if still unresolved, the orchestrator makes the final call (keep | drop) and records *why* it overruled. Never loop unbounded; never silently drop a contested finding.
+> Orchestration follows the challenge-to-consensus loop in CLAUDE.md › Subagent Execution.
 
 Once the findings reach consensus, the orchestrator:
 1. **Deduplicates**: if multiple agents flag the same location for the same reason, keep the highest-severity finding and merge the rationale
@@ -99,6 +100,7 @@ Go through the diff yourself:
 
 ### PR Description Template
 
+<format>
 ```markdown
 ## Background
 ## Root Cause (required for bugs, can be merged into Background)
@@ -106,28 +108,28 @@ Go through the diff yourself:
 ## Changes
 ## Verification
 ```
+</format>
 
 **Background** — Describe the scenario, not the solution.
 
-✅ "When running `model update`, even if only field bindings are changed, the API returns a duplicate name error"
+<example>
+"When running `model update`, even if only field bindings are changed, the API returns a duplicate name error"
+</example>
 
-**Root Cause** — Trace to the actual cause, not just the symptom. Point to the specific code responsible, and explain how you confirmed it is the cause. **Draw a diagram (architecture, sequence, flow, call chain, or state — using ASCII art, Mermaid, or any other text-based format) unless the entire root cause fits in one sentence with no branching.** Prose alone is not acceptable for multi-step or conditional causes.
+**Root Cause** — Trace to the actual cause, not just the symptom. Point to the specific code responsible, and explain how you confirmed it is the cause. **Draw a diagram unless the entire root cause fits in one sentence with no branching.** Prose alone is not acceptable for multi-step or conditional causes.
 
-✅
+<example>
 > `ModelService.java:142` was missing `modelId` in the `modelBasicInfo` object it constructs. This causes the duplicate name check to always treat the current model as a stranger:
 > ```
-> PUT /model/123 (update bindings only)
->   └─ ModelService.buildBasicInfo()     [ModelService.java:138]
->        └─ modelBasicInfo.modelId = null   ← missing assignment
->             └─ DuplicateNameChecker.check(modelBasicInfo)
->                  └─ !Objects.equals(null, m.getId())  → always true
->                       └─ throws DuplicateNameException  ← wrong
+> ModelService.buildBasicInfo() → modelBasicInfo.modelId = null  ← missing assignment
+>   → DuplicateNameChecker: !Objects.equals(null, m.getId()) always true → throws DuplicateNameException  ← wrong
 > ```
 > Confirmed by adding a log at `ModelService.java:142` to print `modelBasicInfo.getModelId()` — it printed `null` on every update request, regardless of the actual model ID.
+</example>
 
-**Solution Overview** — Explain *what* you chose to fix and *why* at that layer, not *how* (the code is the how). **Draw a diagram (architecture, sequence, flow, call chain, or state — using ASCII art, Mermaid, or any other text-based format) showing the corrected path — required unless the fix is a single-line change with no structural effect.** The reviewer must understand the approach from the diagram before reading the diff. List rejected alternatives and why they were ruled out.
+**Solution Overview** — Explain *what* you chose to fix and *why* at that layer, not *how* (the code is the how). **Draw a diagram showing the corrected path — required unless the fix is a single-line change with no structural effect.** The reviewer must understand the approach from the diagram before reading the diff. List rejected alternatives and why they were ruled out.
 
-✅
+<example>
 > Populate `modelId` in `ModelService.buildBasicInfo()` so the duplicate name checker can correctly exclude the current model from comparison. Fix at the construction site rather than inside the checker — the checker should remain a pure validator that assumes valid input.
 >
 > ```
@@ -140,17 +142,20 @@ Go through the diff yourself:
 > ```
 >
 > **Alternatives considered**: add `if (modelId == null) return false` inside `DuplicateNameChecker` — rejected because it silently swallows missing IDs instead of surfacing the upstream omission.
+</example>
 
 **Changes** — What changed AND what did not change. "What did not change" tells the reviewer where the boundary is.
 
-✅ "Added modelId to modelBasicInfo; does not affect the create path (create uses independent logic)"
+<example>
+"Added modelId to modelBasicInfo; does not affect the create path (create uses independent logic)"
+</example>
 
 **Verification** — Two parts are required:
 
 1. **Fix verification** — Show that the root cause scenario no longer reproduces. Paste actual commands and outputs.
 2. **Regression verification** — Show that unaffected paths still work. Cover the paths most likely to be disturbed by the change.
 
-✅
+<example>
 ```
 # Fix verification
 $ curl -X PUT /model/123 -d '{"bindings": [...]}'
@@ -160,6 +165,7 @@ $ curl -X PUT /model/123 -d '{"bindings": [...]}'
 $ curl -X POST /model -d '{"name": "new-model", ...}'
 → 201 Created
 ```
+</example>
 
 **Level of detail by change type:**
 
@@ -178,7 +184,7 @@ $ curl -X POST /model -d '{"name": "new-model", ...}'
 
 Read the PR description and build context before looking at any code: what problem does this solve, what is the root cause, where is the boundary, how was it verified.
 
-**If the description is incomplete, send it back for the author to fill in. Do not start reviewing code.**
+If the description is incomplete, send it back for the author to fill in before reviewing any code.
 
 **Step 2: Read the Code Skeptically**
 
@@ -190,50 +196,36 @@ Work through the following questioning patterns before forming any judgment:
 - The PR says X causes Y. Is there another path that also causes Y, which this fix doesn't touch?
 - The fix is applied at layer A. Could the same bug re-enter from layer B?
 
-*Example: A fix that adds a null-check in the service layer — but the controller can also call the downstream directly, bypassing the check entirely.*
-
 **What if the inputs are different?**
 - What if this field is null / empty / negative / max-int / a very long string?
 - What if the caller sends two concurrent requests for the same resource?
 - What if this runs during a partial failure — e.g., the DB write succeeds but the cache invalidation fails?
-
-*Example: A "create if not exists" implementation that works correctly in isolation but creates duplicates under concurrent load.*
 
 **What if the environment changes?**
 - What if the dependent service is slow or unavailable?
 - What if this is called at 10x the expected volume?
 - What if this code executes in a different order than the author assumed (e.g., retries, async callbacks)?
 
-*Example: A retry loop that is safe when idempotent, but causes double-charges when the underlying operation is not.*
-
 **What scale/load assumption is this code making?**
-- Hot path & complexity: is this code on a frequently called path? Any algorithmic complexity worse than necessary (O(n²) where O(n) suffices, unnecessary nesting, repeated work in tight loops)?
-- IO pattern: any N+1 queries, sync IO inside a loop, missing batching, missing cache where one obviously fits?
-- Scale cliff: works fine at today's data size — what happens at 10x? Any unbounded sort, full-table scan, or in-memory accumulation that fails silently as data grows?
-- Resource limits: connection pool / file descriptors / thread pool / memory — any new path that could exhaust these under load? Missing back-pressure on unbounded queues?
 
-*Example: A `getOrdersByUser()` that loads all orders into memory and filters in-app — works at 200/user, breaks at 10k/user with no warning.*
+Apply the four Performance angles from the 🟡 angles table below (hot path & complexity, IO patterns, scale cliff, resource limits).
 
 **Does the fix hold at the boundary?**
 - The fix works for the described scenario. Does it also work for the adjacent scenario the PR doesn't mention?
 - Is there an off-by-one, a timezone edge, an encoding edge, a locale-specific behavior?
 
-*Example: A date comparison that works correctly in UTC but silently breaks for users in UTC+14.*
-
 **Are the claims in the PR description actually verified?**
 - The PR says "confirmed by logging X" — is that log sufficient proof, or could it be misleading?
 - The PR says "this doesn't affect path Z" — did the author verify that, or just assert it?
 
-*Example: A PR claims the create path is unaffected, but the reviewer finds both create and update share the same helper function that was modified.*
-
 **Output rule**: Every question you raise must be resolved before moving to Step 3.
 - If reading the code answers it → answer it and move on
 - If the code doesn't answer it → it becomes a `[blocking]` or `[question]` comment
-- Do not silently drop questions you cannot answer
+- Raise every question you cannot answer; never silently drop one
 
 **Closing checklist** (after the skeptical pass):
 - Does the change fix the root cause?
-- Does it introduce new problems? Don't only read the diff — read the surrounding code for context.
+- Does it introduce new problems? Read the surrounding code for context, not only the diff.
 - Is the scope appropriate? Anything changed that shouldn't be? Anything missing that should be changed?
 
 **Step 3: Assess Whether Verification Is Credible**
@@ -246,17 +238,18 @@ Work through the following questioning patterns before forming any judgment:
 
 Every comment must be structured as follows:
 
+<format>
 **1. Location** — filename + line number(s). If the problem spans multiple lines or involves an interaction between two places, cite all of them.
 
 **2. Problem** — Structured explanation:
 - **What**: which line(s) or code path cause the issue
-- **Why**: the reasoning — include the execution flow. **Draw a diagram (architecture, sequence, flow, call chain, or state — using ASCII art, Mermaid, or any other text-based format) by default. Skip only if the entire Why fits in one sentence with no branching or concurrency.** A `[blocking]` comment without a diagram is considered incomplete.
+- **Why**: the reasoning — include the execution flow. **Draw a diagram by default. Skip only if the entire Why fits in one sentence with no branching or concurrency.** A `[blocking]` comment without a diagram is considered incomplete.
 - **Proof**: construct the minimal scenario that triggers the problem (e.g., specific input, concurrent timing, config flag). **Proof must be a concrete, executable minimal reproduction** (specific input values, call sequence, or concurrent timing). Hypothetical descriptions like "if X happens then Y" are not allowed. If you cannot construct a concrete proof, you must downgrade severity to `[question]`, never `[blocking]`. **Draw a diagram when the trigger involves a sequence of steps or concurrent timing.**
 
-**3. Suggestion** — A concrete fix direction, with a brief justification for why it is correct. **Draw a diagram (sequence, flow, or call chain — ASCII art, Mermaid, or any text-based format) showing the corrected flow — required unless the fix is a single-line change with no structural effect.** If the suggestion involves a non-trivial change, also show pseudocode and explain why it avoids the problem.
+**3. Suggestion** — A concrete fix direction, with a brief justification for why it is correct. **Draw a diagram showing the corrected flow — required unless the fix is a single-line change with no structural effect.** If the suggestion involves a non-trivial change, also show pseudocode and explain why it avoids the problem.
+</format>
 
-*Example of a well-written comment:*
-
+<format>
 > `[blocking]` **UserService.java:87, TokenValidator.java:34**
 >
 > **What**: `UserService.getUser()` passes the raw `userId` from the request directly to `TokenValidator.validate(userId)` (line 87) without null-checking. `TokenValidator.validate()` dereferences the parameter at line 34 without a guard.
@@ -282,6 +275,7 @@ Every comment must be structured as follows:
 >        └─ UserService.getUser("abc")
 >             └─ TokenValidator.validate("abc")  ← safe
 > ```
+</format>
 
 **Review angles and their priority:**
 
@@ -289,39 +283,37 @@ Every comment must be structured as follows:
 
 | Angle | What to look for |
 |-------|-----------------|
-| **Correctness** | Logic errors, missing boundary conditions, null handling, incomplete branches |
-| **Security** | Unvalidated user input, sensitive data leaked to logs or stdout |
-| **Concurrency safety** | Race conditions, duplicate submission risk, incorrect async ordering |
-| **Idempotency** | Is it safe to retry write operations? Can repeated execution cause side effects? |
-| **Backward compatibility** | Do interface/parameter/output format changes break existing callers? |
-| **Exception path integrity** | Is system state consistent after an exception? Any half-written data? |
-| **Resource management** | Are files/connections properly released? Any memory leaks? |
-| **Impact on other paths** | Does the change accidentally affect other functionality? Read beyond the diff. |
-| **Architecture compliance** | Violates layering rules, module boundaries, or naming conventions |
-| **Maintainability** | This change introduces tight coupling or low cohesion; a function/module takes on too many responsibilities |
+| **Correctness** | Logic errors; missing boundary conditions; null handling; incomplete branches |
+| **Security** | Unvalidated user input; sensitive data in logs or stdout |
+| **Concurrency safety** | Race conditions; duplicate submission; incorrect async ordering |
+| **Idempotency** | Retry-safe writes? Repeated execution causes side effects? |
+| **Backward compatibility** | Interface/parameter/output changes break existing callers? |
+| **Exception path integrity** | Consistent state after exception? Half-written data? |
+| **Resource management** | Files/connections released? Memory leaks? |
+| **Impact on other paths** | Change accidentally affects other functionality? Read beyond the diff. |
+| **Architecture compliance** | Violates layering, module boundaries, or naming conventions |
+| **Maintainability** | Tight coupling; low cohesion; module takes on too many responsibilities |
 
 🟡 **Should flag** → `[question]` or `[blocking]`
 
 | Angle | What to look for |
 |-------|-----------------|
-| **Readability** | Inaccurate names, missing comments on complex logic, functions doing more than one thing |
-| **Abstraction consistency** | High-level business logic and low-level implementation details mixed in the same function |
-| **Error handling** | External calls fail without proper handling; error messages are unclear |
-| **Performance — hot path & complexity** | Algorithmic complexity worse than needed on frequently-called paths (O(n²) where O(n) suffices, unnecessary nesting, repeated work in tight loops) |
-| **Performance — IO patterns** | N+1 queries, sync IO inside a loop, missing batching, missing cache where one obviously fits |
-| **Performance — scale cliff** | Code that works at current data size but degrades sharply at 10x — unbounded sorts, full-table scans, in-memory accumulation that grows with input |
-| **Performance — resource limits** | Connection pool / file descriptors / thread pool / memory exhaustion under load; missing back-pressure on unbounded queues |
-| **Observability** | Missing logs for key operations, incorrect log levels |
-| **Test coverage** | Core logic untested; bug fixes missing regression tests |
-| **Dead code / redundancy** | Unreachable code, duplicated logic, unused variables |
+| **Readability** | Inaccurate names; missing comments on complex logic; function does too many things |
+| **Abstraction consistency** | Business logic mixed with low-level detail in same function |
+| **Error handling** | External calls unhandled; error messages unclear |
+| **Performance — hot path & complexity** | O(n²) where O(n) suffices; unnecessary nesting; repeated work in hot loops |
+| **Performance — IO patterns** | N+1 queries; sync IO in loop; missing batching or cache |
+| **Performance — scale cliff** | Degrades sharply at 10x — unbounded sorts, full-table scans, in-memory accumulation |
+| **Performance — resource limits** | Pool / fd / thread / memory exhaustion under load; missing back-pressure |
+| **Observability** | Missing logs for key operations; wrong log levels |
+| **Test coverage** | Core logic untested; bug fix missing regression test |
+| **Dead code / redundancy** | Unreachable code; duplicated logic; unused variables |
 
-⚪ **Do not flag**
-
-| Angle | Reason |
-|-------|--------|
-| **Code formatting** | Leave it to the linter — it should not appear in review comments |
-| **Personal preference** | If two approaches have no correctness difference, don't comment |
-| **Pre-existing issues** | Problems in code not touched by this PR — open a separate issue instead |
+<avoid>
+- **Code formatting** — leave to the linter; never appear in review comments
+- **Personal preference** — two approaches with no correctness difference; write nothing
+- **Pre-existing issues** — problems in code not touched by this PR; open a separate issue instead
+</avoid>
 
 **Comment labels:**
 
@@ -346,11 +338,10 @@ All comments must have a label. Before writing, ask yourself: if this is not fix
 
 1. **Current behavior** — what the code does now, and under what conditions it becomes a problem (scale threshold, edge case, maintainability cliff)
 2. **Options** — research ≥2 alternatives (including keeping the current approach as a baseline). For each: what it is, its key benefits, and its trade-offs. Use a comparison table when there are ≥3 options.
-3. **Recommendation** — which option you suggest and why. **Draw a diagram (sequence, flow, or call chain — ASCII art, Mermaid, or any text-based format) showing the recommended flow — required unless the recommendation involves no structural change.**
+3. **Recommendation** — which option you suggest and why. **Draw a diagram showing the recommended flow — required unless the recommendation involves no structural change.**
 4. **Trade-off** — what the author gives up by adopting the recommendation, so they can make an informed call
 
-*Example:*
-
+<format>
 > `[suggestion]` **OrderService.java:203**
 >
 > **Current behavior**: `getOrdersByUser(userId)` loads all orders for the user into memory and filters in-application. This works today (~200 orders/user at p99), but will degrade significantly as order volume grows — at 10k orders/user the full result set is loaded on every call.
@@ -375,6 +366,7 @@ All comments must have a label. Before writing, ask yourself: if this is not fix
 > Simpler than pagination, sufficient if the filtered result set stays bounded (which it does for the current use case). Cursor pagination is the right next step only if a single user can accumulate unbounded matching orders.
 >
 > **Trade-off**: Requires a new repository method and a DB index on `(user_id, status)`. Migration is low-risk but needs a schema change. Author decides whether to address now or track as a follow-up.
+</format>
 
 **Aim for at least one `[suggestion]` per review.** Every non-trivial PR touches code that could be improved beyond correctness. Before moving to your conclusion, ask yourself: is there a scale risk, a maintainability cliff, or an industry practice the author may not be aware of? If yes, write a `[suggestion]`. If you genuinely find nothing worth suggesting, that is fine — but the absence should be a conscious decision, not an oversight.
 
@@ -386,9 +378,9 @@ All comments must have a label. Before writing, ask yourself: if this is not fix
 | **Request Changes** | Has blocking issues; re-review required after fixes |
 | **Comment** | Has open questions; conclusion pending |
 
-**Never finish a review without giving a conclusion.**
-
-**Hard requirement**: Every review must end with an explicit conclusion. Outputting comments without providing an Approve / Request Changes / Comment conclusion means the review is incomplete.
+<gate>
+Every review must end with an explicit conclusion. Outputting comments without providing an Approve / Request Changes / Comment conclusion means the review is incomplete.
+</gate>
 
 ---
 
@@ -410,7 +402,7 @@ Every comment must get an explicit response — silence is not acceptable:
 
 **Only the author resolves threads.** Reviewers must not resolve threads on behalf of the author — doing so silently closes the discussion and hides the author's response from future readers.
 
-**When to re-request review**: only after (1) all `[blocking]` issues are fixed, (2) all `[question]` comments have been replied to, and (3) all comment threads are resolved. Do not re-request review with open threads — the reviewer will see unresolved comments and have to ask what's pending.
+**When to re-request review**: only after (1) all `[blocking]` issues are fixed, (2) all `[question]` comments have been replied to, and (3) all comment threads are resolved. Re-requesting review with open threads means the reviewer will have to ask what's pending.
 
 ---
 
@@ -419,7 +411,7 @@ Every comment must get an explicit response — silence is not acceptable:
 When re-reviewing after author changes:
 - **Primary goal**: verify that all previous `[blocking]` and `[question]` findings are correctly addressed
 - **New findings are allowed**: if the reviewer notices a new problem (whether introduced by the fix or previously missed), flag it — but label it explicitly as `[new finding]` so the author knows it was not part of the original review
-- Do not re-open original threads for new issues — open a fresh comment instead
+- Open a fresh comment for new issues; do not re-open original threads
 
 Re-review ends with an updated conclusion (Approve or Request Changes). A re-review that only says "looks good" without checking each previous finding is incomplete.
 
