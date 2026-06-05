@@ -28,7 +28,7 @@ The document has two parts: **Overview** (why + what) confirmed first, then **De
 ## Part 1: Overview Design
 
 **1. Problem & Goals**
-- **Problem** — the pain point and trigger. Quantify if data exists. Do not describe the solution.
+- **Problem** — the pain point and trigger. Quantify if data exists. Describe the pain, not the solution.
 - **Goals** — how success is judged. Quantify when possible. For performance / capacity / SLA goals, quantification is **not optional in Overview**. For other goals, if a number is unavailable now, write "to be quantified in Detail Design" — never leave the gap implicit.
 - **Non-Goals** — required output. What this work explicitly does not cover. Drop any non-goal nobody would do anyway.
 
@@ -37,17 +37,23 @@ The document has two parts: **Overview** (why + what) confirmed first, then **De
 **Diagrams are required, and they come before prose.** Prose explains only what diagrams cannot — participant roles, dependency types, error-path triggers. Restating the diagram in words is grounds for review rejection.
 - **Architecture Diagram** — a single C4 diagram combining Context (L1) and Container (L2) in one view: external actors and external systems outside the boundary, internal containers inside, stay above class/function level. The diagram must answer three questions: (1) what responsibility blocks exist, (2) **what data flows where, and why**, (3) where the key design decision lands. Rules:
   - Unit of analysis is a **responsibility module or service** — never a file or function
-  - **Each box must list "core design" — 3–6 what-level bullets** (responsibilities, key constraints, traceability IDs back to Goals / Risks). **Do not write how-level details** (algorithms, thresholds, field formats, function signatures) — those belong in Detail Design. Examples: ✅ `行号化输出` · `read-gate (G3)` · `staleness 检查 (B2)`; ❌ `cat -n 输出 (lineno + tab + content)` · `> 256KB 拒` · `stored mtime != FS mtime → 拒`
-  - **Arrows carry data flow with both payload and purpose**: each label takes the form `<what data> / <purpose>` (e.g., `path / read-gate check`, `user profile / authz check`). Bare verbs (`updateUser()`) or pure call directions are insufficient — a reader looking at any single arrow alone must know what crosses it and why
+  - **Each box must list "core design" — 3–6 what-level bullets** (responsibilities, key constraints, traceability IDs back to Goals / Risks). Write what-level details; how-level details (algorithms, thresholds, field formats, function signatures) belong in Detail Design.
+
+    <example>`行号化输出` · `read-gate (G3)` · `staleness 检查 (B2)`</example>
+    <counterexample>`cat -n 输出 (lineno + tab + content)` · `> 256KB 拒` · `stored mtime != FS mtime → 拒`</counterexample>
+
+  - **Arrows carry data flow with both payload and purpose**: each label takes the form `<what data> / <purpose>` (e.g., `path / read-gate check`, `user profile / authz check`). A reader looking at any single arrow alone must know what crosses it and why.
   - **Numbered execution sequence (⓪①②③) is optional**: use it when the design has a natural temporal flow that helps the reader follow the main path; skip for purely static structures or multi-entry systems where one sequence cannot represent all paths
   - Annotate the critical design decision directly on the diagram (e.g., "dispatch table — replaces if-elif chain")
   - Mark added / modified / removed via color or annotation
   - Split into separate Context + Container diagrams when box count exceeds ~15, or when external ecosystem is itself the core complexity
   - **Pass/fail test**: a reader who only reads the diagram (no prose) must be able to answer "how does this design achieve the goal?" If they cannot, the diagram is incomplete.
-  - ❌ File tree listing files and their new constants/functions — that is a change inventory, not an architecture
-  - ❌ Boxes labeled only with names; arrows labeled only with verbs or call sites
-  - ✅ Responsibility boxes with what-level core design bullets, arrows labeled `data / purpose`, and a callout on the key decision
-- **Flow Diagrams** — one core flow (main path) and 1–2 edge flows (critical error / boundary paths). Participants are modules / services / roles. **No function names** — those belong in Detail. Flows must show execution order (numbered steps or directed arrows), not just static dependencies.
+
+    <counterexample>File tree listing files and their new constants/functions — that is a change inventory, not an architecture</counterexample>
+    <counterexample>Boxes labeled only with names; arrows labeled only with verbs or call sites</counterexample>
+    <example>Responsibility boxes with what-level core design bullets, arrows labeled `data / purpose`, and a callout on the key decision</example>
+
+- **Flow Diagrams** — one core flow (main path) and 1–2 edge flows (critical error / boundary paths). Participants are modules / services / roles. Keep function names out of flow diagrams — those belong in Detail. Flows must show execution order (numbered steps or directed arrows), not just static dependencies.
 
 **3. Research & Comparison** — **web search is mandatory before writing this section.** Decisions must be grounded in industry practice, not local reasoning.
 - Alternatives considered (industry practice, leading implementations)
@@ -70,15 +76,18 @@ When the module has ≥3 sub-modules, **first show a C4 Component diagram** of i
 
 Per-component contracts: full contract per component. Existing interfaces: signature only. New or modified: full definition (parameters, return, errors, preconditions).
 
+<format>
 ```
 TaskStore.acquire(taskId, agentId, ttl) -> Lease
   pre:    taskId exists; no live lease on it
   returns: Lease{ id, expiresAt }
   errors: TaskNotFound, AlreadyLeased
 ```
+</format>
 
 **2. Data Model / Schema** — per structure: fields with types and defaults; constraints (uniqueness, nullability, cross-field rules); query patterns and indexes; migration path with rollback when changing existing schema.
 
+<format>
 ```
 table tasks(
   id          uuid pk
@@ -88,30 +97,34 @@ table tasks(
 ) index (status, updated_at)
 invariant: status='running' ⇒ lease_id is not null
 ```
+</format>
 
 **3. Core Algorithms / State Machines** — write only what a competent engineer cannot reconstruct in five minutes. State machines: transition diagrams with triggers and side effects. Algorithms: pseudocode plus complexity if performance matters. Document invariants — they become test cases.
 
+<format>
 ```
 pending --start()--> running --finish()--> done
                        │
                        └--timeout()--> failed   (lease released)
 invariant: at most one running lease per task
 ```
+</format>
 
 **4. Error Handling** — for each external interaction (network, IO, user input, cross-module call): failure modes, handling (retry / degrade / propagate / ignore), and what the caller observes.
 
+<format>
 ```
 call           failure          handling          caller sees
 storage.write  transient IO     retry x3 jitter   ok | PersistError
 payment.api    timeout          fail-fast         PaymentTimeout
 ```
+</format>
 
 **5. Implementation Flows** — a **C4 Dynamic diagram at component level**: function-level call sequences between Section 1's components, with class/function names, parameters, and every branch. Only when more detail than the Overview flow is needed; otherwise write "see Overview" and skip.
 
-For this section specifically (refining Writing Principles #5):
-- ≤2 branches or concurrent participants → ASCII call tree (compact, see example below)
-- ≥3 → Mermaid sequence diagram (clearer when branching gets dense)
+Per Writing Principles #5: ≤2 branches or concurrent participants → ASCII call tree; ≥3 → Mermaid sequence diagram.
 
+<example>
 ```
 TaskController.start(req)
   └─ TaskService.start(taskId, agentId)
@@ -120,14 +133,17 @@ TaskController.start(req)
        └─ Worker.dispatch(taskId)
             └─ dispatch error → release lease, 500
 ```
+</example>
 
 **6. Performance Estimation** — required when Goals are quantitative. Estimate throughput / latency on the critical path. State input assumptions (QPS, payload size) and the bottleneck. Stop once the estimate clears the Goal.
 
+<format>
 ```
 target: p99 < 200ms at 1000 QPS
 path:   auth(3ms) + lookup(20ms) + work(80ms) + write(15ms) ≈ 118ms
 bottleneck: write under contention → connection pool ≥ 32
 ```
+</format>
 
 **7. Testing Strategy** — this section is the implementer's reference for writing code and tests. **Every Goal, core module, and core flow needs multiple test cases**, covering all three paths:
 
@@ -146,6 +162,7 @@ Each test case specifies:
 
 **Pass criteria** trace back to the Goal. Quantitative Goal → comparable numeric output. Behavioral Goal → assertion on observable state.
 
+<format>
 ```
 Goal: TaskStore prevents concurrent leases on the same task
 
@@ -158,9 +175,11 @@ T4 edge    integration  lease expires → next acquire succeeds; old lease inval
 Mocks: storage not mocked (uniqueness is the test); clock mocked in T4.
 Pass:  all four pass; T2 repeated 100× with zero flakes.
 ```
+</format>
 
 **8. Migration & Compatibility** — required when modifying existing systems. Cover migration steps in order, canary / rollback plan, compatibility while old and new coexist.
 
+<format>
 ```
 1. add column status_v2 (nullable)
 2. dual-write v1 + v2 for 24h
@@ -169,4 +188,4 @@ Pass:  all four pass; T2 repeated 100× with zero flakes.
 5. drop v1 after 7-day soak
 rollback: keep dual-write, revert reader switch.
 ```
-
+</format>
