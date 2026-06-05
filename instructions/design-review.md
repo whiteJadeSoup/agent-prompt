@@ -8,13 +8,13 @@ The single question every reviewer must answer: **"If we build this, will we reg
 
 Regret has three sources, in priority order:
 
-1. **Wrong problem** — the solution is built, but the user's pain point remains
-2. **Wrong direction** — problem is correct, but the chosen approach cannot achieve the goals
-3. **Unrecognized reality** — direction is correct, but a hidden constraint or assumption will invalidate the plan mid-implementation
+1. **Wrong problem** — solution is built, but the user's pain point remains
+2. **Wrong direction** — problem is correct, but the approach cannot achieve the goals
+3. **Unrecognized reality** — direction is correct, but a hidden constraint will invalidate the plan mid-implementation
 
-If source 1 is confirmed, stop reviewing — the plan needs to restart. Evaluating architecture and risks on a wrong problem wastes everyone's time.
+If source 1 is confirmed, stop — the plan needs to restart. Evaluating architecture on a wrong problem wastes everyone's time.
 
-"More elegant" or "better practice" are `[suggestion]`s, not `[blocking]`. A reviewer who finds a better approach should share it — but it does not block confirmation unless the current approach will cause regret.
+"More elegant" or "better practice" are `[suggestion]`s, not `[blocking]`. A better approach does not block confirmation unless the current one will cause regret.
 
 ---
 
@@ -76,14 +76,6 @@ Two questioning paths apply across all sub-agents:
 - Identify the claim's hidden premises (dependency SLAs, data volume, call ordering, consistency guarantees, team capability)
 - Construct a concrete scenario where the premise fails and describe the impact
 
-<example>
-Premise challenge: "The design assumes the downstream service responds within 100ms. What happens under load when it takes 2s — does the architecture degrade gracefully or cascade-fail?"
-</example>
-
-<example>
-Direction challenge: "The design uses an async queue to decouple producer and consumer. But the Goal requires strong consistency — does async delivery actually satisfy that requirement?"
-</example>
-
 ---
 
 ## Agent A: Wrong Problem
@@ -91,14 +83,14 @@ Direction challenge: "The design uses an async queue to decouple producer and co
 **Core question**: Does this plan solve the right problem for the right people?
 
 **Problem Statement**
-- Is this a real pain point, or a solution disguised as a problem? ("Users need a search box" is a solution, not a problem.)
-- Is there quantitative data supporting the pain point, or is it assumed?
+- Real pain point, or a solution disguised as a problem?
+- Quantitative data supporting the pain point, or assumed?
 
 **Goals & Non-Goals**
-- Is each Goal verifiable — quantified, or explicitly marked "to be quantified in Detail Design"?
-- Performance / capacity / SLA Goals: are they quantified in Overview? Deferral is not allowed for these.
-- Does each Goal trace back to a pain point in Problem Statement? Could all Goals be met while leaving the original pain unresolved?
-- Are Non-Goals real exclusions (things stakeholders might actually request), not "things nobody would do anyway"?
+- Each Goal verifiable — quantified, or explicitly marked "to be quantified in Detail Design"?
+- Performance / capacity / SLA Goals quantified in Overview? Deferral not allowed for these.
+- Each Goal traces back to a pain point? Could all Goals be met while the original pain remains?
+- Non-Goals are real exclusions (things stakeholders might actually request), not "things nobody would do anyway"?
 
 ---
 
@@ -107,22 +99,22 @@ Direction challenge: "The design uses an async queue to decouple producer and co
 **Core question**: Can this approach actually achieve the stated goals?
 
 **Architecture covers each Goal** (static structure)
-- Walk through each Goal — does the architecture have a component responsible for it?
-- If a Goal has no corresponding architectural component, the design has a gap.
+- Each Goal has a component responsible for it?
+- No Goal without a corresponding architectural component?
 
 **Flows carry each Goal** (dynamic execution)
-- Does the core flow complete end-to-end and deliver each Goal?
-- Are 1–2 edge flows present for the critical error / boundary paths?
-- Are flows at Overview granularity (modules / services / roles, **no function names**)?
+- Core flow completes end-to-end and delivers each Goal?
+- 1–2 edge flows present for critical error / boundary paths?
+- Flows at Overview granularity (modules / services / roles, **no function names**)?
 
 **Research & Comparison**
-- Was web search actually performed? Are alternatives concrete (industry implementations), or hand-waved?
-- Are rejected alternatives fairly described, or strawmanned to make the chosen option look better?
-- Does the chosen solution actually align with each Goal — including any quantified targets?
-- If a stated constraint changed (e.g., timeline extended, team doubled), would the decision still hold?
+- Web search actually performed? Alternatives concrete (industry implementations), not hand-waved?
+- Rejected alternatives fairly described, not strawmanned?
+- Chosen solution aligns with each Goal — including quantified targets?
+- Decision still holds if a stated constraint changed (e.g., timeline extended, team doubled)?
 
 **Simplicity**
-- Could a simpler approach achieve the same Goals? If yes, why wasn't it chosen — is the added complexity justified by a real constraint?
+- Could a simpler approach achieve the same Goals? If yes, is the added complexity justified by a real constraint?
 
 ---
 
@@ -131,21 +123,21 @@ Direction challenge: "The design uses an async queue to decouple producer and co
 **Core question**: What hidden assumptions or constraints could invalidate this plan?
 
 **Hidden assumptions**
-- List every implicit assumption in the design: about dependency SLAs, data volume, call ordering, failure modes, consistency guarantees, team capability, deployment environment.
-- For each assumption: is it explicitly stated in the document? If not, it's a hidden risk.
+- List every implicit assumption: dependency SLAs, data volume, call ordering, failure modes, consistency guarantees, team capability, deployment environment.
+- Each assumption explicitly stated in the document? If not, it's a hidden risk.
 
 **Premise failures**
 - For each assumption, construct a concrete scenario where it fails.
-- Describe the impact: does the system degrade gracefully, or does it fail completely?
+- Does the system degrade gracefully, or fail completely?
 
 **Risks (both types required)**
-- **Type A — cost of choosing**: are the trade-offs from picking this option over the alternatives stated honestly, or only soft costs?
-- **Type B — intrinsic fragility**: does the document name failure modes that exist regardless of alternatives — single points of failure, key assumptions, scale cliffs?
-- What is the single most likely failure mode of this design? Is it covered by either Type A or Type B?
+- **Type A — cost of choosing**: trade-offs from picking this option stated honestly, not only soft costs?
+- **Type B — intrinsic fragility**: failure modes that exist regardless of alternatives — single points of failure, key assumptions, scale cliffs?
+- What is the single most likely failure mode? Covered by Type A or Type B?
 
 **Open questions** (optional section)
-- If the section exists: are open questions assigned a decision timeline and owner? An open question with no deadline is a hidden dependency.
-- If the section is absent: did web search genuinely close all questions, or did the author skip the section to avoid surfacing uncertainty?
+- If present: each question has a decision timeline and owner?
+- If absent: web search genuinely closed all questions, or was the section skipped to avoid surfacing uncertainty?
 
 ---
 
@@ -258,16 +250,16 @@ Overview Design + Detail Design + Guide
 
 Map every Goal and Flow from Overview to a section in Detail. Any unmapped item → `[blocking]`.
 
-Inject the coverage map into every section sub-agent's prompt — every section consults it.
+Inject the coverage map into every section sub-agent's prompt.
 
 ---
 
 ### Section 1: Module Responsibilities & Interfaces
 
-Play the role of a caller. Using only the Detail spec, can you implement the calling side correctly?
+As a caller: using only the Detail spec, can you implement the calling side correctly?
 
-- Preconditions complete? Any hidden assumptions the caller won't know?
-- All error cases defined? Can the caller distinguish different failure types?
+- Preconditions complete? Hidden assumptions the caller won't know?
+- All error cases defined? Caller can distinguish different failure types?
 - Return values unambiguous? Any fields "sometimes null" without explanation?
 
 ---
@@ -276,8 +268,8 @@ Play the role of a caller. Using only the Detail spec, can you implement the cal
 
 Construct an illegal business state that the schema permits.
 
-- Any field combination that's schema-valid but business-invalid? (e.g., `status=completed`, `completed_at=null`)
-- Any cross-field dependencies not expressed as constraints?
+- Any field combination schema-valid but business-invalid? (e.g., `status=completed`, `completed_at=null`)
+- Cross-field dependencies not expressed as constraints?
 - Indexes aligned with actual query patterns?
 
 ---
@@ -287,8 +279,8 @@ Construct an illegal business state that the schema permits.
 Find an input or state that makes the algorithm produce a wrong result.
 
 - Any legal event with no defined state transition?
-- Do declared invariants hold on all execution paths?
-- Does each flow from Overview's Solution Design have a corresponding execution path here?
+- Declared invariants hold on all execution paths?
+- Each flow from Overview's Solution Design has a corresponding execution path here?
 
 ---
 
@@ -296,20 +288,20 @@ Find an input or state that makes the algorithm produce a wrong result.
 
 List all external interaction points. For each: is the failure mode named and handled?
 
-- Can the caller distinguish transient from permanent failures?
-- Are retries idempotent?
-- Does error path behavior match the error-path test cases in Testing Strategy?
+- Caller can distinguish transient from permanent failures?
+- Retries idempotent?
+- Error path behavior matches error-path test cases in Testing Strategy?
 
 ---
 
 ### Section 5: Implementation Flows
 
-Compare against the flows in Overview's Solution Design.
+Compare against Overview's Solution Design flows.
 
-- Every Overview flow has a function-level counterpart, when granularity differs?
+- Every Overview flow has a function-level counterpart (when granularity differs)?
 - All branches covered, not just the main path?
 - Parameters consistent with Section 1 interfaces?
-- For Goals deferred as "to be quantified in Detail Design": are the numeric criteria now present and carried by the flow?
+- Goals deferred as "to be quantified in Detail Design": numeric criteria now present and carried by the flow?
 
 ---
 
@@ -326,8 +318,8 @@ One question: **is the estimate credible?**
 ### Section 7: Testing Strategy
 
 - Every Goal, core module, and core flow has happy + edge + error test cases?
-- Each test case specifies concrete input, observable expected behavior, and a single test level (unit / integration / e2e)?
-- Mock boundaries justified, with rationale per boundary? Does mocking hide a real integration risk (schema constraints, concurrency, external failure modes)?
+- Each test case specifies concrete input, observable expected output, and a single level (unit / integration / e2e)?
+- Mock boundaries justified with rationale per boundary? Mocking hides a real integration risk (schema constraints, concurrency, external failure modes)?
 - Pass criteria trace back to Goals — quantitative Goals produce comparable numbers, behavioral Goals produce assertions on observable state?
 
 ---
@@ -336,8 +328,8 @@ One question: **is the estimate credible?**
 
 Forward compatibility is the default.
 
-- Does the change break existing callers, data readers, or rollback paths?
-- If yes: are risks, affected parties, and resolution steps explicitly stated? If not → `[blocking]`
+- Change breaks existing callers, data readers, or rollback paths?
+- If yes: risks, affected parties, and resolution steps explicitly stated? If not → `[blocking]`
 
 ---
 
